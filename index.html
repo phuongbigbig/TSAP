@@ -105,6 +105,13 @@
        display:inline-flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.12)}
   #expandBtn:hover{filter:brightness(.96)}
   .panel.modal #expandBtn{position:fixed;right:30px;bottom:30px}
+  .cardExpandBtn{position:absolute;top:6px;right:10px;width:30px;height:30px;padding:0;font-size:16px;line-height:1;z-index:6;
+       border-radius:7px;border:1px solid var(--accent);background:#fff;color:var(--accent);
+       display:inline-flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+  .cardExpandBtn:hover{background:var(--accentSoft)}
+  .panel.modal .cardExpandBtn{position:fixed;top:30px;right:30px;width:36px;height:36px;font-size:18px}
+  .panel.modal .chartwrap{height:calc(100vh - 96px);display:flex;align-items:center;justify-content:center;overflow:auto}
+  .panel.modal #chart svg{width:100%!important;height:100%!important;max-width:none!important}
   #pageThemePanel{margin:4px 0 28px}
   .themeswatch{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.8);cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .1s}
   .themeswatch:hover{transform:scale(1.15)}
@@ -231,8 +238,9 @@
 
   <!-- CENTER: plot + results -->
   <div class="col">
-    <div class="panel">
+    <div class="panel" id="plotPanel">
       <h2>Plot</h2>
+      <button class="cardExpandBtn" id="plotExpandBtn" onclick="togglePlotExpand()" title="Expand / collapse the plot">⤢</button>
       <div class="chartwrap" id="chart"></div>
     </div>
     <div class="panel">
@@ -291,10 +299,10 @@
         <div id="themeSwatch" style="display:flex;gap:3px;margin-top:5px"></div>
       </div>
       <div class="ctlrow"><span style="font-size:12px;color:var(--muted)">Band:</span>
-        <div class="seg" id="bandSeg"><button data-b="sem" class="on">±SEM</button><button data-b="sd">±SD</button><button data-b="ci">95% CI</button><button data-b="none">None</button></div>
+        <div class="seg" id="bandSeg"><button data-b="sem">±SEM</button><button data-b="sd" class="on">±SD</button><button data-b="ci">95% CI</button><button data-b="none">None</button></div>
       </div>
 
-      <label style="margin-top:6px"><input type="checkbox" id="dotsChk" style="width:auto;margin-right:6px">Overlay replicate points</label>
+      <label style="margin-top:6px"><input type="checkbox" id="dotsChk" checked style="width:auto;margin-right:6px">Overlay replicate points</label>
       <label><input type="checkbox" id="spaghettiChk" style="width:auto;margin-right:6px">Individual replicate lines (spaghetti)</label>
       <label><input type="checkbox" id="markersChk" checked style="width:auto;margin-right:6px">Show markers at each timepoint</label>
       <label><input type="checkbox" id="smoothChk" style="width:auto;margin-right:6px">Moving-average smoothing</label>
@@ -388,7 +396,7 @@ var tpoints=[0,10,30,60,120];
 var series=['Control','Treated'];
 var nRep=3;
 var data=[]; // data[ti][si] = array of nRep strings
-var cfg={chart:'line',color:'color',band:'sem',lw:1,fs:1,W:680,ar:1.391};
+var cfg={chart:'line',color:'color',band:'sd',lw:1,fs:1,W:680,ar:1.391};
 var expanded=false;
 var repeated=false; // repeated-measures mode: replicate columns = subjects tracked over time
 var PALETTE=null;
@@ -1190,6 +1198,8 @@ function applyRMUI(){
 document.getElementById('rmChk').addEventListener('change',e=>{repeated=e.target.checked;applyRMUI();showAnBlocks();update();applyReco();});
 function loadExample(which){if(which==='dense')exampleDense();else exampleFew();renderGrid();update();}
 function toggleExpand(){expanded=!expanded;var p=document.getElementById('dataPanel');document.getElementById('expandBtn').textContent=expanded?'⤡':'⤢';var bd=document.getElementById('inputBackdrop');if(expanded){p.classList.add('modal');if(!bd){bd=document.createElement('div');bd.id='inputBackdrop';bd.className='backdrop';bd.onclick=toggleExpand;document.body.appendChild(bd);}}else{p.classList.remove('modal');if(bd)bd.remove();}}
+var plotExpanded=false;
+function togglePlotExpand(){plotExpanded=!plotExpanded;var p=document.getElementById('plotPanel');document.getElementById('plotExpandBtn').textContent=plotExpanded?'⤡':'⤢';var bd=document.getElementById('plotBackdrop');if(plotExpanded){p.classList.add('modal');if(!bd){bd=document.createElement('div');bd.id='plotBackdrop';bd.className='backdrop';bd.onclick=togglePlotExpand;document.body.appendChild(bd);}}else{p.classList.remove('modal');if(bd)bd.remove();}}
 function segWire(id,key,map){document.getElementById(id).addEventListener('click',e=>{var b=e.target.closest('button');if(!b)return;[...e.currentTarget.children].forEach(x=>x.classList.remove('on'));b.classList.add('on');cfg[key]=b.dataset[map];update();});}
 segWire('chartSeg','chart','t');segWire('colorSeg','color','c');segWire('bandSeg','band','b');
 document.getElementById('colorSeg').addEventListener('click',()=>{document.getElementById('themeWrap').style.display=cfg.color==='color'?'block':'none';});
@@ -1220,7 +1230,7 @@ document.getElementById('fsIn').addEventListener('input',e=>{cfg.fs=+e.target.va
 document.getElementById('wIn').addEventListener('input',e=>{cfg.W=Math.max(300,+e.target.value||680);update();});
 document.getElementById('arIn').addEventListener('change',e=>{cfg.ar=+e.target.value;update();});
 // init
-renderPageThemes();applyPageTheme('graphite');
+renderPageThemes();applyPageTheme('crimson');
 showAnBlocks();updateTpRefVis();
 exampleFew();renderGrid();update();
 applyReco(); // start on the analysis best suited to the example data
