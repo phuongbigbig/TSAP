@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Time-series Analysis Platform (TSAP)</title>
+<style>
+  :root{
+    --bg:#5b6675; --bg2:#2f3640; --panel:#ffffff; --ink:#1d2733; --muted:#5d6b7a;
+    --line:#dfe4ea; --accent:#2b6cb0; --accentSoft:#e9f1f9;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       background:var(--bg);background-image:linear-gradient(to bottom,rgba(0,0,0,0) 55%,rgba(0,0,0,0.28) 100%);
+       background-attachment:fixed;color:var(--ink);font-size:14px;line-height:1.45;min-height:100vh}
+  header{background:#1d2733;color:#fff;padding:14px 22px;position:relative;overflow:hidden}
+  header h1{margin:0;font-size:18px;font-weight:600;position:relative;z-index:2;color:#ffe9a8}
+  header p{margin:3px 0 0;font-size:12.5px;color:#aab6c2;position:relative;z-index:2}
+  #headerDeco{position:absolute;top:0;right:0;height:100%;width:62%;max-width:760px;z-index:1;pointer-events:none}
+  .topwrap{padding:16px 16px 0}
+  .topwrap .panel{margin-bottom:0}
+  .wrap{display:grid;grid-template-columns:360px minmax(0,1fr) 350px;gap:16px;padding:16px;align-items:start}
+  @media(max-width:1180px){.wrap{grid-template-columns:1fr 1fr}}
+  @media(max-width:760px){.wrap{grid-template-columns:1fr}}
+  .col{min-width:0}
+  .panel{background:var(--panel);border:1px solid rgba(0,0,0,.15);border-radius:10px;padding:16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.18);position:relative}
+  .panel>h2:first-child{margin:-16px -16px 14px;padding:9px 16px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;
+       color:var(--accent);background:var(--accentSoft);border-bottom:2px solid var(--accent);border-radius:10px 10px 0 0}
+  label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+  input[type=text],input[type=number],select{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:6px;font-size:13px;background:#fff;color:var(--ink)}
+  input[type=range]{width:100%}
+  .row{display:flex;gap:10px}.row>div{flex:1;min-width:0}
+  button{cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:6px;padding:7px 11px;font-size:12.5px;color:var(--ink)}
+  button:hover{background:#eef2f6}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.primary:hover{background:#255a96}
+  .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .steppers{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;align-items:center}
+  .stepper{display:inline-flex;align-items:center;gap:6px}
+  .stepper>span{font-size:12.5px;color:var(--muted);font-weight:600;margin-right:1px}
+  .stepper button{width:34px;height:34px;padding:0;font-size:22px;line-height:1;font-weight:600;border-radius:8px;
+       display:inline-flex;align-items:center;justify-content:center;border:1px solid #bcd3ea;background:#e8f1fb;color:#1f5fa0}
+  .stepper button:hover{background:#d6e7f8}
+  .stepper button:active{background:#c4dbf3}
+  .stepper button.minus{border-color:#e6cdbc;background:#fbeee6;color:#a85a28}
+  .stepper button.minus:hover{background:#f6e0d2}
+  table.grid{border-collapse:collapse;width:100%;margin-top:8px}
+  table.grid th,table.grid td{border:1px solid var(--line);padding:0}
+  table.grid th{background:#f0f3f6;font-size:11px;color:var(--muted);padding:5px 6px;font-weight:600}
+  table.grid td input{width:100%;border:none;padding:6px 6px;font-size:12.5px;text-align:center;background:transparent;color:var(--ink)}
+  table.grid td input:focus{outline:2px solid var(--accent);outline-offset:-2px;background:#fff}
+  table.grid td.name input{text-align:left;font-weight:600}
+  table.grid td.time input{text-align:center;font-weight:700;background:#f7f9fb}
+  table.grid th.tcol{background:#e3eaf1;border-bottom:2px solid var(--accent)}
+  table.grid th.grp{background:#e3eaf1;border-bottom:2px solid var(--accent)}
+  table.grid th.grp input{font-weight:700;text-align:center;color:var(--ink);background:transparent;border:none;width:100%;padding:5px 4px}
+  table.grid th.grp input:focus{outline:2px solid var(--accent);outline-offset:-2px;background:#fff}
+  table.grid th.grpgap,table.grid td.grpgap{border:none;width:9px;background:transparent}
+  .ctlrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;flex-wrap:wrap}
+  .seg button{border:none;border-radius:0;padding:6px 12px}
+  .seg button.on{background:var(--accent);color:#fff}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:6px}
+  .chartwrap{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto;text-align:center}
+  #chart svg{max-width:100%;height:auto}
+  .pairlist .pair{display:inline-flex;align-items:center;gap:6px;background:#eef2f6;border-radius:14px;padding:3px 10px;margin:3px 4px 0 0;font-size:12px}
+  .pairlist .pair button{border:none;background:transparent;padding:0 2px;font-size:14px;color:#c05621}
+  .statsbox{font-size:12.5px;max-height:330px;overflow:auto}
+  .statsbox table{border-collapse:collapse;width:100%}
+  .statsbox th,.statsbox td{border-bottom:1px solid var(--line);padding:5px 7px;text-align:left}
+  .statsbox th{color:var(--muted);font-weight:600}
+  .sig{font-weight:700}
+  .tag{display:inline-block;font-size:10.5px;background:#eef2f6;border-radius:10px;padding:1px 7px;color:var(--muted);margin-left:6px}
+  .err{color:#c05621;font-size:12px;margin-top:6px}
+  .switch{position:relative;display:inline-block;width:42px;height:22px;vertical-align:middle}
+  .switch input{opacity:0;width:0;height:0}
+  .switch .track{position:absolute;inset:0;background:#c4ccd4;border-radius:22px;transition:.2s;cursor:pointer}
+  .switch .track:before{content:"";position:absolute;height:16px;width:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+  .switch input:checked+.track{background:var(--accent)}
+  .switch input:checked+.track:before{transform:translateX(20px)}
+  .rmbanner{background:#fff8e6;border:1px solid #e6c878;border-left:4px solid #d4942f;border-radius:7px;padding:9px 11px;font-size:11.8px;color:#5a4a25;margin-top:8px;line-height:1.5}
+  .rmbanner b{color:#8a5a12}
+  .reco{background:var(--accentSoft);border:1px solid var(--accent);border-left:4px solid var(--accent);border-radius:7px;padding:9px 11px;font-size:12px;color:var(--ink);margin-bottom:10px}
+  .reco b{color:var(--accent)}
+  .reco button{margin-left:6px;padding:3px 10px;font-size:11.5px;background:var(--accent);color:#fff;border:none;border-radius:5px;font-weight:600}
+  .reco button:hover{filter:brightness(.93)}
+  .reco .okmark{color:#2f855a;font-weight:700;margin-left:6px}
+  details{margin-top:8px}summary{cursor:pointer;color:var(--accent);font-size:12.5px}
+  .slabel{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin:10px 0 2px}
+  .slabel b{color:var(--ink);font-weight:600}
+  .exportcard{background:linear-gradient(135deg,var(--accent),#1d2733);border-color:rgba(0,0,0,.25)}
+  .exportcard>h2:first-child{background:transparent;border:none;margin:0 0 12px;padding:0;color:#ffe9a8;display:flex;align-items:center;gap:8px}
+  .exbtns{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .exbtns button{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:6px;background:rgba(255,255,255,.95);color:#1d2733;
+       border:none;border-radius:8px;font-weight:600;font-size:12px;padding:10px 8px;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+  .exbtns button:hover{background:#fff;transform:translateY(-1px)}
+  .exbtns button svg{stroke:var(--accent)}
+  .panel.modal{position:fixed;inset:18px;z-index:200;overflow:auto;box-shadow:0 12px 50px rgba(0,0,0,.5);
+       transform-origin:bottom right;animation:growIn .24s cubic-bezier(.2,.7,.3,1)}
+  @keyframes growIn{from{transform:scale(.55);opacity:.25}to{transform:scale(1);opacity:1}}
+  .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:150;animation:fadeIn .24s ease}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  #expandBtn{position:absolute;right:12px;bottom:10px;width:34px;height:34px;padding:0;font-size:17px;line-height:1;
+       border-radius:8px;border:1px solid var(--accent);background:var(--accentSoft);color:var(--accent);
+       display:inline-flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+  #expandBtn:hover{filter:brightness(.96)}
+  .panel.modal #expandBtn{position:fixed;right:30px;bottom:30px}
+  #pageThemePanel{margin:4px 0 28px}
+  .themeswatch{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.8);cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .1s}
+  .themeswatch:hover{transform:scale(1.15)}
+  .themeswatch.active{outline:2px solid #fff;outline-offset:2px}
+  .copyright{text-align:center;font-size:11px;color:rgba(255,255,255,.8);padding:14px 0 22px;margin-top:6px}
+</style>
+</head>
+<body>
+<header id="appHeader">
+  <h1>Time-series Analysis Platform (TSAP)</h1>
+  <p>Manual / paste entry · line · area · heatmap · facets · trend regression, per-timepoint tests, AUC, two-way ANOVA, autocorrelation · SVG &amp; PNG export</p>
+</header>
+
+<div class="topwrap">
+    <div class="panel" id="dataPanel">
+      <h2>1 · Data input</h2>
+      <div class="hint" id="modeHint">Each <b>row</b> is a timepoint (enter its time in the first column). Each <b>series</b> has one or more replicate columns; the line shows the mean across replicates and the band shows its spread. <b>Tip:</b> copy a block of cells from Excel and paste onto any cell — values outside the table are ignored.</div>
+
+      <div class="ctlrow" style="margin-top:10px">
+        <span style="font-size:12px;color:var(--muted)">Design:</span>
+        <label class="switch"><input type="checkbox" id="rmChk"><span class="track"></span></label>
+        <span id="rmLabel" style="font-size:12.5px;font-weight:600">Independent samples</span>
+      </div>
+      <div class="rmbanner" id="rmBanner" style="display:none"></div>
+
+      <div id="gridWrap" style="overflow-x:auto;margin-top:6px">
+        <div id="gridTS"></div>
+      </div>
+
+      <div class="steppers">
+        <span class="stepper"><span>Series</span><button onclick="addSeries()" title="Add series">+</button><button class="minus" onclick="removeSeries()" title="Remove series">−</button></span>
+        <span class="stepper"><span>Time</span><button onclick="addTime()" title="Add timepoint">+</button><button class="minus" onclick="removeTime()" title="Remove timepoint">−</button></span>
+        <span class="stepper"><span id="repLabel">Replicate</span><button onclick="addRep()" title="Add replicate">+</button><button class="minus" onclick="removeRep()" title="Remove replicate">−</button></span>
+      </div>
+      <div class="btns"><button onclick="loadExample('few')">Example · replicated</button><button onclick="loadExample('dense')">Example · dense signal</button></div>
+      <div class="err" id="dataErr"></div>
+      <button id="expandBtn" onclick="toggleExpand()" title="Expand / collapse the input table">⤢</button>
+    </div>
+</div>
+
+<div class="wrap">
+  <!-- LEFT: analysis + export -->
+  <div class="col">
+    <div class="panel exportcard">
+      <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>Export</h2>
+      <div class="exbtns">
+        <button onclick="exportSVG()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>Plot · SVG</button>
+        <button onclick="exportPNG()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>Plot · PNG</button>
+        <button onclick="exportTable()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>Stats · CSV</button>
+        <button onclick="exportXLSX()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>Stats · XLSX</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>2 · Analysis</h2>
+      <div class="reco" id="recoBox"></div>
+      <label>Analysis type</label>
+      <select id="analysisSel">
+        <option value="trend">Linear trend regression (per series)</option>
+        <option value="timepoint">Per-timepoint comparison (series vs series)</option>
+        <option value="auc">Area under curve (AUC) + comparison</option>
+        <option value="twoway">Two-way ANOVA (time × series)</option>
+        <option value="acf">Autocorrelation (ACF) of one series</option>
+        <option value="corr">Correlation between two series</option>
+      </select>
+
+      <div id="anTimepoint" class="anBlock" style="display:none">
+        <div class="row">
+          <div>
+            <label>Test across series</label>
+            <select id="tpTestSel"><option value="anova">One-way ANOVA</option><option value="ttest">Welch t (vs reference)</option></select>
+          </div>
+          <div>
+            <label>Correction (over timepoints)</label>
+            <select id="tpAdjSel"><option value="holm">Holm</option><option value="bonferroni">Bonferroni</option><option value="none">None</option></select>
+          </div>
+        </div>
+        <div id="tpRefWrap"><label>Reference series (for t-test)</label><select id="tpRefSel"></select></div>
+      </div>
+
+      <div id="anAcf" class="anBlock" style="display:none">
+        <label>Series</label><select id="acfSeriesSel"></select>
+        <div class="slabel"><span>Max lag</span><b id="acfLagVal">6</b></div>
+        <input type="range" id="acfLagIn" min="1" max="20" step="1" value="6">
+      </div>
+
+      <div id="anCorr" class="anBlock" style="display:none">
+        <div class="row">
+          <div><label>Series A</label><select id="corrA"></select></div>
+          <div><label>Series B</label><select id="corrB"></select></div>
+        </div>
+        <label>Method</label><select id="corrMethod"><option value="pearson">Pearson</option><option value="spearman">Spearman</option></select>
+      </div>
+
+      <div id="anAuc" class="anBlock" style="display:none">
+        <label>Reference series (AUC compared via Welch t on per-replicate AUC)</label>
+        <select id="aucRefSel"></select>
+      </div>
+
+      <div class="hint" id="anHint"></div>
+      <div class="btns" style="margin-top:12px">
+        <button class="primary" style="width:100%;padding:9px" onclick="recalculate()">↻ Recalculate analysis</button>
+      </div>
+      <div class="hint" id="recalcHint" style="text-align:right"></div>
+    </div>
+
+    <div class="panel" id="pyPanel">
+      <h2>2b · Advanced engine (Python)</h2>
+      <div class="hint">Runs real <b>statsmodels</b> in your browser via <b>Pyodide</b> (WebAssembly). The first load downloads the Python runtime (~one time, needs internet); the JS engine above keeps working offline.</div>
+      <div class="btns"><button class="primary" id="pyLoadBtn" style="width:100%;padding:9px" onclick="loadPyEngine()">⬇ Load Python engine</button></div>
+      <div class="hint" id="pyStatus" style="margin-top:8px"></div>
+      <div id="pyControls" style="display:none">
+        <label>Model</label>
+        <select id="pyModel" onchange="updatePyModelHint()">
+          <option value="mixed_ri">Mixed-effects — random intercept (per subject)</option>
+          <option value="mixed_ris">Mixed-effects — random intercept + slope</option>
+          <option value="anova3">Two-way ANOVA — Type III (unbalanced-safe)</option>
+        </select>
+        <div class="hint" id="pyModelHint"></div>
+        <div class="btns" style="margin-top:10px"><button class="primary" id="pyRunBtn" style="width:100%;padding:9px" onclick="runPy()">▶ Run in Python</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTER: plot + results -->
+  <div class="col">
+    <div class="panel">
+      <h2>Plot</h2>
+      <div class="chartwrap" id="chart"></div>
+    </div>
+    <div class="panel">
+      <h2>Analysis results</h2>
+      <div class="statsbox" id="stats"></div>
+      <details open><summary>Methods &amp; notes</summary><div class="hint" id="methodNotes" style="max-height:200px;overflow:auto"></div></details>
+    </div>
+    <div class="panel" id="pyResultPanel" style="display:none">
+      <h2>Advanced results (Python · statsmodels)</h2>
+      <div class="statsbox" id="pyOut" style="max-height:460px"></div>
+    </div>
+
+    <div id="pageThemePanel">
+      <div style="text-align:center;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:7px">Page colour theme</div>
+      <div id="pageThemeRow" style="display:flex;flex-wrap:wrap;gap:9px;justify-content:center"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: appearance -->
+  <div class="col">
+    <div class="panel">
+      <h2>3 · Appearance</h2>
+      <label>Plot title</label>
+      <input type="text" id="titleIn" value="Expression over time">
+      <div class="row">
+        <div><label>X-axis title</label><input type="text" id="xlabIn" value="Time (min)"></div>
+        <div><label>Y-axis title</label><input type="text" id="ylabIn" value="Value"></div>
+      </div>
+
+      <div class="ctlrow" style="margin-top:10px"><span style="font-size:12px;color:var(--muted)">Plot type:</span>
+        <div class="seg" id="chartSeg"><button data-t="line" class="on">Line</button><button data-t="area">Area</button><button data-t="heatmap">Heatmap</button><button data-t="facet">Facets</button></div>
+      </div>
+      <div class="ctlrow"><span style="font-size:12px;color:var(--muted)">Fill:</span>
+        <div class="seg" id="colorSeg"><button data-c="color" class="on">Color</button><button data-c="shade">B/W shade</button><button data-c="bw">B/W dashes</button></div>
+      </div>
+      <div id="themeWrap">
+        <label>Color theme</label>
+        <select id="themeSel">
+          <optgroup label="ggsci journal palettes">
+            <option value="npg">NPG — Nature Publishing Group</option>
+            <option value="aaas">AAAS — Science</option>
+            <option value="nejm">NEJM — N. Engl. J. Med.</option>
+            <option value="lancet">Lancet</option>
+            <option value="jama">JAMA</option>
+            <option value="jco">JCO — J. Clin. Oncol.</option>
+            <option value="bmj">BMJ</option>
+            <option value="uchicago">UChicago</option>
+            <option value="d3">D3 (d3.js category10)</option>
+          </optgroup>
+          <optgroup label="Generic">
+            <option value="classic">Classic (muted)</option>
+            <option value="pastel">Pastel</option>
+            <option value="grey">Greyscale</option>
+          </optgroup>
+        </select>
+        <div id="themeSwatch" style="display:flex;gap:3px;margin-top:5px"></div>
+      </div>
+      <div class="ctlrow"><span style="font-size:12px;color:var(--muted)">Band:</span>
+        <div class="seg" id="bandSeg"><button data-b="sem" class="on">±SEM</button><button data-b="sd">±SD</button><button data-b="ci">95% CI</button><button data-b="none">None</button></div>
+      </div>
+
+      <label style="margin-top:6px"><input type="checkbox" id="dotsChk" style="width:auto;margin-right:6px">Overlay replicate points</label>
+      <label><input type="checkbox" id="spaghettiChk" style="width:auto;margin-right:6px">Individual replicate lines (spaghetti)</label>
+      <label><input type="checkbox" id="markersChk" checked style="width:auto;margin-right:6px">Show markers at each timepoint</label>
+      <label><input type="checkbox" id="smoothChk" style="width:auto;margin-right:6px">Moving-average smoothing</label>
+      <label><input type="checkbox" id="trendChk" style="width:auto;margin-right:6px">Overlay linear trend lines</label>
+      <label><input type="checkbox" id="legendChk" checked style="width:auto;margin-right:6px">Show legend</label>
+
+      <div class="slabel"><span>Smoothing window</span><b id="smWinVal">3</b></div>
+      <input type="range" id="smWinIn" min="2" max="9" step="1" value="3">
+
+      <div class="slabel"><span>Line weight</span><b id="lwVal">1.0×</b></div>
+      <input type="range" id="lwIn" min="0.4" max="3" step="0.1" value="1">
+
+      <div class="slabel"><span>Font size</span><b id="fsVal">1.0×</b></div>
+      <input type="range" id="fsIn" min="0.7" max="1.8" step="0.05" value="1">
+
+      <div class="row" style="margin-top:12px">
+        <div><label>Width (px)</label><input type="number" id="wIn" value="680" min="300" max="2000" step="20"></div>
+        <div><label>Aspect ratio</label>
+          <select id="arIn">
+            <option value="1.6">16:10</option>
+            <option value="1.777">16:9</option>
+            <option value="1.5">3:2</option>
+            <option value="1.391" selected>Standard (≈3:2)</option>
+            <option value="1.333">4:3</option>
+            <option value="1">Square</option>
+          </select>
+        </div>
+      </div>
+      <div class="hint" id="sizeHint"></div>
+    </div>
+
+    <div class="panel">
+      <h2>4 · Analysis explained</h2>
+      <div class="statsbox" id="explainBox" style="max-height:340px;line-height:1.5"></div>
+    </div>
+  </div>
+</div>
+
+<div class="copyright">© 2026 Copyright by Nguyen Thanh Phuong</div>
+
+<script>
+/* ===================== STATISTICS ENGINE ===================== */
+function logGamma(x){var c=[76.18009172947146,-86.50532032941677,24.01409824083091,-1.231739572450155,0.1208650973866179e-2,-0.5395239384953e-5];var ser=1.000000000190015,xx=x,y=x,tmp=x+5.5;tmp-=(xx+0.5)*Math.log(tmp);for(var j=0;j<6;j++){y+=1;ser+=c[j]/y;}return -tmp+Math.log(2.5066282746310005*ser/xx);}
+function betacf(a,b,x){var MAXIT=200,EPS=3e-12,FPMIN=1e-300,qab=a+b,qap=a+1,qam=a-1,c=1,d=1-qab*x/qap;if(Math.abs(d)<FPMIN)d=FPMIN;d=1/d;var h=d;for(var m=1;m<=MAXIT;m++){var m2=2*m,aa=m*(b-m)*x/((qam+m2)*(a+m2));d=1+aa*d;if(Math.abs(d)<FPMIN)d=FPMIN;c=1+aa/c;if(Math.abs(c)<FPMIN)c=FPMIN;d=1/d;h*=d*c;aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));d=1+aa*d;if(Math.abs(d)<FPMIN)d=FPMIN;c=1+aa/c;if(Math.abs(c)<FPMIN)c=FPMIN;d=1/d;var del=d*c;h*=del;if(Math.abs(del-1)<EPS)break;}return h;}
+function betai(a,b,x){if(x<=0)return 0;if(x>=1)return 1;var bt=Math.exp(logGamma(a+b)-logGamma(a)-logGamma(b)+a*Math.log(x)+b*Math.log(1-x));if(x<(a+1)/(a+b+2))return bt*betacf(a,b,x)/a;return 1-bt*betacf(b,a,1-x)/b;}
+function tDistP(t,df){if(!isFinite(t)||df<=0)return 1;return betai(df/2,0.5,df/(df+t*t));}
+function fDistP(F,d1,d2){if(!isFinite(F)||F<=0)return 1;return betai(d2/2,d1/2,d2/(d2+d1*F));}
+function mean(a){return a.reduce((s,v)=>s+v,0)/a.length;}
+function variance(a){if(a.length<2)return 0;var m=mean(a);return a.reduce((s,v)=>s+(v-m)*(v-m),0)/(a.length-1);}
+function sd(a){return Math.sqrt(variance(a));}
+function welch(a,b){var n1=a.length,n2=b.length,m1=mean(a),m2=mean(b),v1=variance(a),v2=variance(b),se=Math.sqrt(v1/n1+v2/n2);if(se===0)return{t:0,df:n1+n2-2,p:1};var t=(m1-m2)/se,df=Math.pow(v1/n1+v2/n2,2)/(Math.pow(v1/n1,2)/(n1-1)+Math.pow(v2/n2,2)/(n2-1));return{t:t,df:df,p:tDistP(t,df)};}
+function anova(groups){var k=groups.length,N=0,all=[];groups.forEach(g=>{N+=g.length;all=all.concat(g);});var grand=mean(all),ssb=0,ssw=0;groups.forEach(g=>{var m=mean(g);ssb+=g.length*(m-grand)*(m-grand);g.forEach(v=>ssw+=(v-m)*(v-m));});var dfb=k-1,dfw=N-k,msb=ssb/dfb,msw=ssw/dfw;return{F:msb/msw,dfb:dfb,dfw:dfw,msw:msw,ssb:ssb,ssw:ssw,p:fDistP(msb/msw,dfb,dfw)};}
+function adjustP(ps,method){var m=ps.length;if(method==='bonferroni')return ps.map(p=>Math.min(1,p*m));if(method==='holm'){var idx=ps.map((p,i)=>[p,i]).sort((x,y)=>x[0]-y[0]),out=new Array(m),prev=0;idx.forEach((pair,rank)=>{var adj=Math.min(1,(m-rank)*pair[0]);adj=Math.max(adj,prev);prev=adj;out[pair[1]]=adj;});return out;}return ps.slice();}
+function stars(p){if(!(p<=0.05))return'ns';if(p>0.01)return'*';if(p>0.001)return'**';return'***';}
+function fmtP(p){return p<0.001?'p<0.001':'p='+p.toFixed(3);}
+// inverse Student-t: returns t such that the two-sided tail probability = alpha (e.g. alpha=0.05 -> 95% crit)
+function invT(alpha,df){if(df<=0)return 1.96;var lo=0,hi=1000;for(var i=0;i<80;i++){var mid=(lo+hi)/2;if(tDistP(mid,df)>alpha)lo=mid;else hi=mid;}return (lo+hi)/2;}
+
+/* ---- time-series specific stats ---- */
+// linear regression y ~ x; returns slope, intercept, r2, p of slope
+function linreg(xs,ys){var n=xs.length;if(n<2)return null;var mx=mean(xs),my=mean(ys),sxx=0,sxy=0,syy=0;for(var i=0;i<n;i++){sxx+=(xs[i]-mx)*(xs[i]-mx);sxy+=(xs[i]-mx)*(ys[i]-my);syy+=(ys[i]-my)*(ys[i]-my);}if(sxx===0)return null;var slope=sxy/sxx,intercept=my-slope*mx,sse=Math.max(0,syy-slope*sxy),r2=syy>0?1-sse/syy:1;var df=n-2,seSlope=df>0?Math.sqrt((sse/df)/sxx):0,t=seSlope>0?slope/seSlope:0,p=df>0?tDistP(t,df):1;return{slope:slope,intercept:intercept,r2:r2,n:n,df:df,t:t,p:p,seSlope:seSlope};}
+// trapezoidal AUC over sorted (x,y)
+function trapAUC(xs,ys){var idx=xs.map((x,i)=>i).sort((a,b)=>xs[a]-xs[b]),s=0;for(var k=1;k<idx.length;k++){var a=idx[k-1],b=idx[k];s+=(xs[b]-xs[a])*(ys[a]+ys[b])/2;}return s;}
+// autocorrelation of an evenly-indexed sequence
+function acf(y,maxLag){var n=y.length,m=mean(y),den=0;for(var i=0;i<n;i++)den+=(y[i]-m)*(y[i]-m);var out=[];for(var L=0;L<=maxLag;L++){var num=0;for(var t=0;t+L<n;t++)num+=(y[t]-m)*(y[t+L]-m);out.push(den>0?num/den:0);}return out;}
+function rank(a){var idx=a.map((v,i)=>[v,i]).sort((x,y)=>x[0]-y[0]),r=new Array(a.length),i=0;while(i<idx.length){var j=i;while(j+1<idx.length&&idx[j+1][0]===idx[i][0])j++;var avg=(i+j)/2+1;for(var k=i;k<=j;k++)r[idx[k][1]]=avg;i=j+1;}return r;}
+function pearson(xs,ys){var n=xs.length;if(n<3)return null;var mx=mean(xs),my=mean(ys),sxy=0,sxx=0,syy=0;for(var i=0;i<n;i++){sxy+=(xs[i]-mx)*(ys[i]-my);sxx+=(xs[i]-mx)*(xs[i]-mx);syy+=(ys[i]-my)*(ys[i]-my);}if(sxx===0||syy===0)return null;var r=sxy/Math.sqrt(sxx*syy),df=n-2,t=r*Math.sqrt(df/Math.max(1e-12,1-r*r)),p=tDistP(t,df);return{r:r,n:n,df:df,t:t,p:p};}
+function spearman(xs,ys){if(xs.length<3)return null;var rx=rank(xs),ry=rank(ys),res=pearson(rx,ry);if(res)res.rho=res.r;return res;}
+// two-way ANOVA with factors Time (T levels) and Series (S levels), replicates per cell
+function twoWayANOVA(cells,T,S){ // cells[ti][si] = replicate numbers; tolerant of unequal n and empty cells
+  var all=[],N=0,nonEmpty=0;for(var ti=0;ti<T;ti++)for(var si=0;si<S;si++){var c=cells[ti][si]||[];if(c.length){nonEmpty++;N+=c.length;all=all.concat(c);}}
+  if(N<3||nonEmpty<2)return null;
+  var grand=mean(all);
+  var rowSum=new Array(T).fill(0),rowN=new Array(T).fill(0),colSum=new Array(S).fill(0),colN=new Array(S).fill(0);
+  var ssCells=0,ssError=0;
+  for(ti=0;ti<T;ti++)for(si=0;si<S;si++){var c=cells[ti][si]||[];if(!c.length)continue;var m=mean(c);ssCells+=c.length*(m-grand)*(m-grand);c.forEach(v=>ssError+=(v-m)*(v-m));rowSum[ti]+=c.reduce((a,b)=>a+b,0);rowN[ti]+=c.length;colSum[si]+=c.reduce((a,b)=>a+b,0);colN[si]+=c.length;}
+  var Tp=rowN.filter(x=>x>0).length,Sp=colN.filter(x=>x>0).length;
+  var ssTime=0;for(ti=0;ti<T;ti++)if(rowN[ti]){var rmn=rowSum[ti]/rowN[ti];ssTime+=rowN[ti]*(rmn-grand)*(rmn-grand);}
+  var ssSeries=0;for(si=0;si<S;si++)if(colN[si]){var cmn=colSum[si]/colN[si];ssSeries+=colN[si]*(cmn-grand)*(cmn-grand);}
+  var ssInter=Math.max(0,ssCells-ssTime-ssSeries);
+  var dfTime=Tp-1,dfSeries=Sp-1,dfError=N-nonEmpty,dfInter=(nonEmpty-1)-dfTime-dfSeries;
+  if(dfError<1||dfTime<1||dfSeries<1)return null;
+  var msErr=ssError/dfError;
+  function row(ss,df){if(df<1||!(msErr>0))return null;var ms=ss/df,F=ms/msErr;return{ss:ss,df:df,ms:ms,F:F,p:fDistP(F,df,dfError)};}
+  return{time:row(ssTime,dfTime),series:row(ssSeries,dfSeries),inter:row(ssInter,dfInter),error:{ss:ssError,df:dfError,ms:msErr},N:N,emptyCells:nonEmpty<Tp*Sp,nonEmpty:nonEmpty,Tp:Tp,Sp:Sp};
+}
+
+/* ===================== DATA MODEL ===================== */
+// timepoints (numeric x), series names, data[ti][si] = [rep strings]
+var tpoints=[0,10,30,60,120];
+var series=['Control','Treated'];
+var nRep=3;
+var data=[]; // data[ti][si] = array of nRep strings
+var cfg={chart:'line',color:'color',band:'sem',lw:1,fs:1,W:680,ar:1.391};
+var expanded=false;
+var repeated=false; // repeated-measures mode: replicate columns = subjects tracked over time
+var PALETTE=null;
+
+function blankCell(){var a=[];for(var i=0;i<nRep;i++)a.push('');return a;}
+function ensure(){for(var ti=0;ti<tpoints.length;ti++){if(!data[ti])data[ti]=[];for(var si=0;si<series.length;si++){if(!data[ti][si])data[ti][si]=blankCell();while(data[ti][si].length<nRep)data[ti][si].push('');data[ti][si].length=nRep;}data[ti].length=series.length;}data.length=tpoints.length;}
+
+function exampleFew(){
+  tpoints=[0,10,30,60,120,180,240,300,360];series=['Control','Treated_1','Treated_2'];nRep=3;
+  // columns per row: [Control reps],[Treated_1 reps],[Treated_2 reps]
+  data=[
+    [['1.00','0.95','1.05'],['1.02','0.98','1.10'],['0.98','1.04','1.00']],
+    [['1.05','0.92','1.08'],['1.60','1.45','1.75'],['1.10','1.00','1.20']],
+    [['0.98','1.10','0.95'],['2.40','2.10','2.55'],['1.35','1.20','1.45']],
+    [['1.03','0.97','1.06'],['1.90','1.70','2.05'],['1.75','1.55','1.90']],
+    [['1.00','1.04','0.96'],['1.30','1.15','1.45'],['2.30','2.05','2.45']],
+    [['0.97','1.02','1.05'],['1.10','0.98','1.18'],['2.55','2.25','2.70']],
+    [['1.02','0.96','1.00'],['1.00','0.90','1.08'],['2.05','1.80','2.20']],
+    [['0.99','1.05','0.94'],['0.95','0.88','1.02'],['1.55','1.35','1.65']],
+    [['1.01','0.98','1.03'],['0.92','0.85','0.98'],['1.20','1.05','1.30']]
+  ];ensure();
+}
+function exampleDense(){
+  series=['Sensor A','Sensor B'];nRep=1;tpoints=[];data=[];
+  for(var i=0;i<24;i++){tpoints.push(i);
+    var a=10+6*Math.sin(i/3)+ (i*0.15) + (Math.random()-0.5)*1.2;
+    var b=12+4*Math.cos(i/4)+ (Math.random()-0.5)*1.4;
+    data.push([[a.toFixed(2)],[b.toFixed(2)]]);
+  }ensure();
+}
+
+// compute per-series clean structure
+function computeSeries(){
+  ensure();
+  var out=[];
+  for(var si=0;si<series.length;si++){
+    var pts=[];
+    for(var ti=0;ti<tpoints.length;ti++){
+      var t=parseFloat(tpoints[ti]);if(!isFinite(t))continue;
+      var reps=data[ti][si].filter(v=>v!==null&&v!==undefined&&String(v).trim()!==''&&isFinite(Number(v))).map(Number);
+      if(reps.length)pts.push({t:t,reps:reps,mean:mean(reps),n:reps.length});
+    }
+    pts.sort((a,b)=>a.t-b.t);
+    out.push({name:series[si],pts:pts});
+  }
+  return out;
+}
+
+/* ---- repeated-measures: replicate column r = one subject tracked across all timepoints ---- */
+function computeRMData(){
+  ensure();
+  var ord=tpoints.map((t,i)=>({t:Number(t),i:i})).filter(o=>isFinite(o.t)).sort((a,b)=>a.t-b.t);
+  var T=ord.length;
+  var out=[];
+  for(var s=0;s<series.length;s++){
+    var subs=[],dropped=0;
+    for(var r=0;r<nRep;r++){
+      var vals=[],ok=true;
+      for(var k=0;k<T;k++){var raw=data[ord[k].i][s][r];var v=Number(raw);if(raw===''||raw==null||String(raw).trim()===''||!isFinite(v)){ok=false;break;}vals.push(v);}
+      if(ok&&T>0)subs.push(vals);else dropped++;
+    }
+    out.push({name:series[s],subjects:subs,dropped:dropped});
+  }
+  return {times:ord.map(o=>o.t),T:T,series:out};
+}
+// split-plot repeated-measures ANOVA: Series between-subjects, Time within-subjects, random intercept per subject
+function rmANOVA(rm){
+  var T=rm.T,groups=rm.series.filter(g=>g.subjects.length>0),S=groups.length;
+  if(T<2)return{error:'Repeated-measures ANOVA needs ≥2 timepoints.'};
+  var Ntot=0;groups.forEach(g=>Ntot+=g.subjects.length);
+  if(Ntot<2)return{error:'Need ≥2 complete subjects (a subject must have a value at every timepoint).'};
+  if(Ntot<=S)return{error:'Need more subjects than series (each series needs ≥1 subject, with ≥2 subjects total beyond the number of series for an error term).'};
+  var sum=0,cnt=0;groups.forEach(g=>g.subjects.forEach(sb=>sb.forEach(v=>{sum+=v;cnt++;})));var G=sum/cnt;
+  var seriesMean=groups.map(g=>{var s=0,c=0;g.subjects.forEach(sb=>sb.forEach(v=>{s+=v;c++;}));return s/c;});
+  var timeMean=[];for(var t=0;t<T;t++){var s=0,c=0;groups.forEach(g=>g.subjects.forEach(sb=>{s+=sb[t];c++;}));timeMean[t]=s/c;}
+  var cellMean=groups.map(g=>{var arr=[];for(var t=0;t<T;t++){var s=0;g.subjects.forEach(sb=>s+=sb[t]);arr[t]=s/g.subjects.length;}return arr;});
+  var subjMean=groups.map(g=>g.subjects.map(sb=>mean(sb)));
+  var SS_between=0;groups.forEach((g,gi)=>g.subjects.forEach((sb,si)=>{SS_between+=T*Math.pow(subjMean[gi][si]-G,2);}));
+  var SS_series=0;groups.forEach((g,gi)=>{SS_series+=g.subjects.length*T*Math.pow(seriesMean[gi]-G,2);});
+  var SS_subj=Math.max(0,SS_between-SS_series);
+  var SS_withinTot=0;groups.forEach((g,gi)=>g.subjects.forEach((sb,si)=>{for(var t=0;t<T;t++)SS_withinTot+=Math.pow(sb[t]-subjMean[gi][si],2);}));
+  var SS_time=0;for(t=0;t<T;t++)SS_time+=Ntot*Math.pow(timeMean[t]-G,2);
+  var SS_TS=0;groups.forEach((g,gi)=>{for(t=0;t<T;t++)SS_TS+=g.subjects.length*Math.pow(cellMean[gi][t]-seriesMean[gi]-timeMean[t]+G,2);});
+  var SS_TSubj=Math.max(0,SS_withinTot-SS_time-SS_TS);
+  var df_series=S-1,df_subj=Ntot-S,df_time=T-1,df_TS=(T-1)*(S-1),df_TSubj=(Ntot-S)*(T-1);
+  var MS_subj=df_subj>0?SS_subj/df_subj:NaN,MS_TSubj=df_TSubj>0?SS_TSubj/df_TSubj:NaN;
+  function Frow(ss,df,msErr,dfErr){if(df<=0||!(msErr>0)||dfErr<=0)return null;var ms=ss/df,f=ms/msErr;return{ss:ss,df:df,ms:ms,F:f,p:fDistP(f,df,dfErr)};}
+  return{
+    S:S,T:T,Ntot:Ntot,
+    series:Frow(SS_series,df_series,MS_subj,df_subj),
+    subj:{ss:SS_subj,df:df_subj,ms:MS_subj},
+    time:Frow(SS_time,df_time,MS_TSubj,df_TSubj),
+    inter:Frow(SS_TS,df_TS,MS_TSubj,df_TSubj),
+    tsubj:{ss:SS_TSubj,df:df_TSubj,ms:MS_TSubj},
+    used:groups.map(g=>({name:g.name,n:g.subjects.length})),
+    dropped:rm.series.map(g=>({name:g.name,d:g.dropped}))
+  };
+}
+// per-subject random-slopes trend: fit a slope per subject, test mean slope vs 0, compare slopes between series
+function rmTrend(rm){
+  var rows=rm.series.map(g=>{
+    var slopes=g.subjects.map(sb=>{var lr=linreg(rm.times,sb);return lr?lr.slope:null;}).filter(v=>v!=null);
+    var o={name:g.name,nSub:slopes.length,slopes:slopes};
+    if(slopes.length>=2){o.meanSlope=mean(slopes);o.sdSlope=sd(slopes);var sem=o.sdSlope/Math.sqrt(slopes.length);o.t=sem>0?o.meanSlope/sem:0;o.df=slopes.length-1;o.p=tDistP(o.t,o.df);}
+    else if(slopes.length===1){o.meanSlope=slopes[0];}
+    return o;
+  });
+  var withSlopes=rows.filter(r=>r.slopes.length>=2);
+  var groupCmp=null;
+  if(withSlopes.length>=2)groupCmp=anova(withSlopes.map(r=>r.slopes));
+  return{rows:rows,groupCmp:groupCmp,T:rm.T};
+}
+
+/* ===================== INPUT GRID ===================== */
+function escAttr(s){return String(s).replace(/"/g,'&quot;');}
+function escHtml(s){return String(s).replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
+function renderGrid(){
+  ensure();
+  var html='<label style="margin-top:6px">Timepoints (rows) × series (columns), with replicates</label>';
+  html+='<table class="grid"><tr><th class="tcol" rowspan="2">Time</th>';
+  series.forEach((s,si)=>{if(si)html+='<th class="grpgap" rowspan="2"></th>';html+='<th class="grp" colspan="'+nRep+'"><input value="'+escAttr(s)+'" oninput="setSeries('+si+',this.value)"></th>';});
+  html+='</tr><tr>';
+  var unit=repeated?'S':'R';
+  series.forEach((s,si)=>{for(var c=0;c<nRep;c++)html+='<th title="'+(repeated?'Subject '+(c+1)+' followed across all timepoints':'Replicate '+(c+1))+'">'+unit+(c+1)+'</th>';});
+  html+='</tr>';
+  tpoints.forEach((tp,ti)=>{
+    html+='<tr><td class="time"><input type="number" step="any" value="'+escAttr(tp)+'" oninput="setTime('+ti+',this.value)" onpaste="pasteTime(event,'+ti+')"></td>';
+    series.forEach((s,si)=>{if(si)html+='<td class="grpgap"></td>';for(var c=0;c<nRep;c++)html+='<td><input type="number" step="any" value="'+escAttr(data[ti][si][c]??'')+'" oninput="setVal('+ti+','+si+','+c+',this.value)" onpaste="pasteGrid(event,'+ti+','+si+','+c+')"></td>';});
+    html+='</tr>';
+  });
+  html+='</table>';
+  document.getElementById('gridTS').innerHTML=html;
+  refreshSelectors();
+}
+function setSeries(si,v){series[si]=v;refreshSelectors();update();}
+function setTime(ti,v){tpoints[ti]=v;update();}
+function setVal(ti,si,c,v){data[ti][si][c]=v;update();}
+function clip2grid(e){var t=(e.clipboardData||window.clipboardData).getData('text');if(!t)return null;var lines=t.replace(/\r/g,'').split('\n');if(lines.length&&lines[lines.length-1]==='')lines.pop();return lines.map(l=>l.split('\t'));}
+function pasteGrid(e,ti,si,c){var m=clip2grid(e);if(!m||(m.length===1&&m[0].length===1))return;e.preventDefault();
+  // paste flows across replicate columns of the current series then wraps into following series
+  m.forEach((cols,i)=>cols.forEach((val,j)=>{var rr=ti+i,flat=si*nRep+c+j;var ss=Math.floor(flat/nRep),cc=flat%nRep;if(rr<tpoints.length&&ss<series.length)data[rr][ss][cc]=val.trim();}));
+  renderGrid();update();}
+function pasteTime(e,ti){var m=clip2grid(e);if(!m||(m.length===1&&m[0].length===1))return;e.preventDefault();m.forEach((cols,i)=>{var rr=ti+i;if(rr<tpoints.length&&cols.length)tpoints[rr]=cols[0].trim();});renderGrid();update();}
+function addSeries(){series.push('Series '+(series.length+1));data.forEach(row=>row.push(blankCell()));renderGrid();update();}
+function removeSeries(){if(series.length>1){series.pop();data.forEach(row=>row.pop());renderGrid();update();}}
+function addTime(){var last=parseFloat(tpoints[tpoints.length-1]);var nt=isFinite(last)?last+ (tpoints.length>1? (last-parseFloat(tpoints[tpoints.length-2])||1):1):tpoints.length;tpoints.push(nt);data.push(series.map(()=>blankCell()));renderGrid();update();}
+function removeTime(){if(tpoints.length>2){tpoints.pop();data.pop();renderGrid();update();}}
+function addRep(){nRep++;data.forEach(row=>row.forEach(c=>c.push('')));renderGrid();update();}
+function removeRep(){if(nRep>1){nRep--;data.forEach(row=>row.forEach(c=>c.pop()));renderGrid();update();}}
+function refreshSelectors(){
+  var opts=series.map((s,i)=>'<option value="'+i+'">'+escHtml(s)+'</option>').join('');
+  ['tpRefSel','acfSeriesSel','corrA','corrB','aucRefSel'].forEach(id=>{var el=document.getElementById(id);if(!el)return;var keep=el.value;el.innerHTML=opts;if(keep!==''&&+keep<series.length)el.value=keep;});
+  var cb=document.getElementById('corrB');if(cb&&series.length>1&&cb.value==='0'&&document.getElementById('corrA').value==='0')cb.value='1';
+}
+
+/* ===================== PALETTES ===================== */
+var THEMES={
+  npg:    ['#E64B35','#4DBBD5','#00A087','#3C5488','#F39B7F','#8491B4','#91D1C2','#DC0000','#7E6148','#B09C85'],
+  aaas:   ['#3B4992','#EE0000','#008B45','#631879','#008280','#BB0021','#5F559B','#A20056','#808180','#1B1919'],
+  nejm:   ['#BC3C29','#0072B5','#E18727','#20854E','#7876B1','#6F99AD','#FFDC91','#EE4C97'],
+  lancet: ['#00468B','#ED0000','#42B540','#0099B4','#925E9F','#FDAF91','#AD002A','#ADB6B6','#1B1919'],
+  jama:   ['#374E55','#DF8F44','#00A1D5','#B24745','#79AF97','#6A6599','#80796B'],
+  jco:    ['#0073C2','#EFC000','#868686','#CD534C','#7AA6DC','#003C67','#8F7700','#3B3B3B','#A73030','#4A6990'],
+  bmj:    ['#2A6EBB','#F0AB00','#C50084','#7D5CC6','#E37222','#69BE28','#00B2A9','#CD202C','#747678'],
+  d3:     ['#1F77B4','#FF7F0E','#2CA02C','#D62728','#9467BD','#8C564B','#E377C2','#7F7F7F','#BCBD22','#17BECF'],
+  uchicago:['#800000','#767676','#FFA319','#8A9045','#155F83','#C16622','#8F3931','#58593F','#350E20'],
+  classic:['#4878d0','#ee854a','#6acc64','#d65f5f','#956cb4','#8c613c','#dc7ec0'],
+  pastel: ['#a1c9f4','#ffb482','#8de5a1','#ff9f9b','#d0bbff','#fab0e4','#cfcfcf'],
+  grey:   ['#1a1a1a','#4d4d4d','#7a7a7a','#999999','#b3b3b3','#cccccc','#e0e0e0']
+};
+PALETTE=THEMES.npg;
+var DASHES=['','6 4','2 3','8 3 2 3','1 4','10 4','4 4 1 4'];
+function grayFor(idx,n){if(n<=1)return '#333';var t=idx/(n-1),v=Math.round(30+t*(190-30));return 'rgb('+v+','+v+','+v+')';}
+function seriesColor(idx,n){if(cfg.color==='color')return PALETTE[idx%PALETTE.length];if(cfg.color==='shade')return grayFor(idx,n);return '#111';}
+function seriesDash(idx){return cfg.color==='bw'?DASHES[idx%DASHES.length]:'';}
+function hexToRgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+
+/* ===================== AXIS HELPERS ===================== */
+function niceNum(x,round){var exp=Math.floor(Math.log10(Math.abs(x)||1)),f=x/Math.pow(10,exp),nf;if(round){nf=f<1.5?1:f<3?2:f<7?5:10;}else{nf=f<=1?1:f<=2?2:f<=5?5:10;}return nf*Math.pow(10,exp);}
+function axisTicks(lo,hi,n){if(lo===hi){lo-=0.5;hi+=0.5;}var range=niceNum(hi-lo,false),step=niceNum(range/Math.max(1,n-1),true),gLo=Math.floor(lo/step)*step,gHi=Math.ceil(hi/step)*step,out=[];for(var v=gLo;v<=gHi+step/2;v+=step)out.push(+v.toPrecision(10));return{ticks:out,lo:gLo,hi:gHi,step:step};}
+function fmtTick(t){if(Math.abs(t)<1e-9)return '0';var a=Math.abs(t);if(a>=1000||a<0.01)return t.toPrecision(3);return (t%1===0?t.toString():(+t.toFixed(2)).toString());}
+function seriesBandHalf(p){if(cfg.band==='none'||p.n<2)return 0;var s=sd(p.reps);if(cfg.band==='sd')return s;var sem=s/Math.sqrt(p.n);if(cfg.band==='sem')return sem;return invT(0.05,p.n-1)*sem;} // 95% CI = t(0.975,n-1)*SEM
+
+function movingAvg(ys,w){var out=[],h=Math.floor(w/2);for(var i=0;i<ys.length;i++){var a=Math.max(0,i-h),b=Math.min(ys.length-1,i+h),s=0,c=0;for(var k=a;k<=b;k++){s+=ys[k];c++;}out.push(s/c);}return out;}
+
+/* ===================== PLOT: shared frame ===================== */
+function dataExtent(S){var xs=[],ys=[];S.forEach(s=>s.pts.forEach(p=>{xs.push(p.t);var h=seriesBandHalf(p);ys.push(p.mean+h);ys.push(p.mean-h);if(document.getElementById('dotsChk').checked||document.getElementById('spaghettiChk').checked)p.reps.forEach(r=>ys.push(r));}));return{xs:xs,ys:ys};}
+
+function buildLineSVG(S){
+  var FS=cfg.fs,LW=cfg.lw,W=cfg.W,H=Math.round(W/cfg.ar);
+  var f=px=>(px*FS).toFixed(1);
+  var mL=Math.round(58+22*FS),mR=Math.round(18+6*FS),mT=Math.round(40+16*FS),mB=Math.round(56+22*FS);
+  var plotW=W-mL-mR,plotH=H-mT-mB;
+  var ext=dataExtent(S);
+  if(!ext.xs.length)return emptySVG(W,H,mT,mL,plotW,plotH);
+  var xMin=Math.min.apply(null,ext.xs),xMax=Math.max.apply(null,ext.xs);
+  var yMin=Math.min.apply(null,ext.ys),yMax=Math.max.apply(null,ext.ys);
+  var xa=axisTicks(xMin,xMax,6),ya=axisTicks(Math.min(0,yMin),yMax,6);
+  function X(t){return mL+(t-xa.lo)/(xa.hi-xa.lo)*plotW;}
+  function Y(v){return mT+plotH-(v-ya.lo)/(ya.hi-ya.lo)*plotH;}
+  var s=frameStart(W,H);
+  s+=axes(mL,mT,plotW,plotH,xa,ya,X,Y,f,FS,LW);
+  var n=S.length;
+  var showBand=cfg.band!=='none', showDots=document.getElementById('dotsChk').checked, showSpag=document.getElementById('spaghettiChk').checked;
+  var showMark=document.getElementById('markersChk').checked, smooth=document.getElementById('smoothChk').checked, trend=document.getElementById('trendChk').checked;
+  var smW=+document.getElementById('smWinIn').value;
+  S.forEach((ser,si)=>{
+    if(ser.pts.length<1)return;
+    var col=seriesColor(si,n),dash=seriesDash(si);
+    // band
+    if(showBand){var hasBand=ser.pts.some(p=>p.n>=2);if(hasBand){var up='',dn='';ser.pts.forEach((p,i)=>{var h=seriesBandHalf(p);up+=(i?' L':'M')+X(p.t).toFixed(1)+','+Y(p.mean+h).toFixed(1);});for(var i=ser.pts.length-1;i>=0;i--){var p=ser.pts[i],h=seriesBandHalf(p);dn+=' L'+X(p.t).toFixed(1)+','+Y(p.mean-h).toFixed(1);}var rgb=cfg.color==='color'?hexToRgb(col):[80,80,80];s+='<path d="'+up+dn+' Z" fill="rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+',0.16)" stroke="none"/>';}}
+    // spaghetti (per replicate index)
+    if(showSpag){for(var r=0;r<nRep;r++){var d='',started=false;ser.pts.forEach(p=>{if(p.reps[r]!==undefined&&isFinite(p.reps[r])){d+=(started?' L':'M')+X(p.t).toFixed(1)+','+Y(p.reps[r]).toFixed(1);started=true;}});if(d)s+='<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="'+(LW*0.8).toFixed(2)+'" stroke-opacity="0.32"/>';}}
+    // mean line
+    var ys=ser.pts.map(p=>p.mean),xs=ser.pts.map(p=>p.t);
+    var plotYs=smooth?movingAvg(ys,smW):ys;
+    var d='';ser.pts.forEach((p,i)=>{d+=(i?' L':'M')+X(p.t).toFixed(1)+','+Y(plotYs[i]).toFixed(1);});
+    s+='<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="'+(LW*2).toFixed(2)+'"'+(dash?' stroke-dasharray="'+dash+'"':'')+' stroke-linejoin="round" stroke-linecap="round"/>';
+    // trend overlay
+    if(trend){var allx=[],ally=[];ser.pts.forEach(p=>p.reps.forEach(r=>{allx.push(p.t);ally.push(r);}));var lr=linreg(allx,ally);if(lr){var x1=xa.lo,x2=xa.hi;s+='<line x1="'+X(x1).toFixed(1)+'" y1="'+Y(lr.intercept+lr.slope*x1).toFixed(1)+'" x2="'+X(x2).toFixed(1)+'" y2="'+Y(lr.intercept+lr.slope*x2).toFixed(1)+'" stroke="'+col+'" stroke-width="'+(LW*1).toFixed(2)+'" stroke-dasharray="2 3" stroke-opacity="0.8"/>';}}
+    // markers
+    if(showMark)ser.pts.forEach((p,i)=>{s+='<circle cx="'+X(p.t).toFixed(1)+'" cy="'+Y(plotYs[i]).toFixed(1)+'" r="'+(3.1*Math.sqrt(FS)).toFixed(1)+'" fill="#fff" stroke="'+col+'" stroke-width="'+(LW*1.4).toFixed(2)+'"/>';});
+    // dots
+    if(showDots)ser.pts.forEach(p=>p.reps.forEach(r=>{s+='<circle cx="'+X(p.t).toFixed(1)+'" cy="'+Y(r).toFixed(1)+'" r="'+(2.1*Math.sqrt(FS)).toFixed(1)+'" fill="'+col+'" fill-opacity="0.55"/>';}));
+  });
+  s+=titleAndLabels(W,H,mT,mL,plotW,plotH,FS,f);
+  if(document.getElementById('legendChk').checked)s+=legendBox(S,mL,mR,mT,plotW,FS,LW,f,'line');
+  document.getElementById('sizeHint').textContent='Output: '+W+' × '+H+' px';
+  return svgWrap(W,H,s);
+}
+
+function buildAreaSVG(S){
+  var FS=cfg.fs,LW=cfg.lw,W=cfg.W,H=Math.round(W/cfg.ar);
+  var f=px=>(px*FS).toFixed(1);
+  var mL=Math.round(58+22*FS),mR=Math.round(18+6*FS),mT=Math.round(40+16*FS),mB=Math.round(56+22*FS);
+  var plotW=W-mL-mR,plotH=H-mT-mB;
+  // union of timepoints
+  var tset={};S.forEach(s=>s.pts.forEach(p=>tset[p.t]=1));var times=Object.keys(tset).map(Number).sort((a,b)=>a-b);
+  if(!times.length)return emptySVG(W,H,mT,mL,plotW,plotH);
+  function at(ser,t){var p=ser.pts.find(q=>q.t===t);return p?p.mean:0;}
+  var stacks=times.map(t=>{var cum=0,arr=[];S.forEach(ser=>{var v=Math.max(0,at(ser,t));cum+=v;arr.push(cum);});return arr;});
+  var xMin=times[0],xMax=times[times.length-1],yMax=Math.max.apply(null,stacks.map(a=>a[a.length-1]).concat(0.0001));
+  var xa=axisTicks(xMin,xMax,6),ya=axisTicks(0,yMax,6);
+  function X(t){return mL+(t-xa.lo)/(xa.hi-xa.lo)*plotW;}
+  function Y(v){return mT+plotH-(v-ya.lo)/(ya.hi-ya.lo)*plotH;}
+  var s=frameStart(W,H);
+  s+=axes(mL,mT,plotW,plotH,xa,ya,X,Y,f,FS,LW);
+  var n=S.length;
+  for(var si=n-1;si>=0;si--){
+    var top='',bot='';times.forEach((t,i)=>{top+=(i?' L':'M')+X(t).toFixed(1)+','+Y(stacks[i][si]).toFixed(1);});
+    for(var i=times.length-1;i>=0;i--){var below=si>0?stacks[i][si-1]:0;bot+=' L'+X(times[i]).toFixed(1)+','+Y(below).toFixed(1);}
+    var col=seriesColor(si,n),rgb=cfg.color==='color'?hexToRgb(col):[120-si*12,120-si*12,120-si*12];
+    s+='<path d="'+top+bot+' Z" fill="rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+',0.78)" stroke="#fff" stroke-width="'+(LW*0.8).toFixed(2)+'"/>';
+  }
+  s+=titleAndLabels(W,H,mT,mL,plotW,plotH,FS,f);
+  if(document.getElementById('legendChk').checked)s+=legendBox(S,mL,mR,mT,plotW,FS,LW,f,'area');
+  document.getElementById('sizeHint').textContent='Output: '+W+' × '+H+' px (stacked area)';
+  return svgWrap(W,H,s);
+}
+
+function buildHeatmapSVG(S){
+  var FS=cfg.fs,LW=cfg.lw,W=cfg.W,H=Math.round(W/cfg.ar);
+  var f=px=>(px*FS).toFixed(1);
+  var mL=Math.round(96+20*FS),mR=Math.round(54+8*FS),mT=Math.round(40+16*FS),mB=Math.round(54+22*FS);
+  var plotW=W-mL-mR,plotH=H-mT-mB;
+  var tset={};S.forEach(s=>s.pts.forEach(p=>tset[p.t]=1));var times=Object.keys(tset).map(Number).sort((a,b)=>a-b);
+  if(!times.length)return emptySVG(W,H,mT,mL,plotW,plotH);
+  var n=S.length,T=times.length;
+  var vals=[],vmin=Infinity,vmax=-Infinity;
+  S.forEach(ser=>{var rowv=times.map(t=>{var p=ser.pts.find(q=>q.t===t);return p?p.mean:null;});rowv.forEach(v=>{if(v!=null){vmin=Math.min(vmin,v);vmax=Math.max(vmax,v);}});vals.push(rowv);});
+  if(!isFinite(vmin)){vmin=0;vmax=1;}
+  function colFor(v){if(v==null)return '#eee';var t=(v-vmin)/((vmax-vmin)||1);
+    // viridis-ish gradient
+    var stops=[[68,1,84],[59,82,139],[33,145,140],[94,201,98],[253,231,37]];
+    var x=t*(stops.length-1),i=Math.min(stops.length-2,Math.floor(x)),fr=x-i;
+    var c=stops[i].map((a,k)=>Math.round(a+(stops[i+1][k]-a)*fr));return 'rgb('+c[0]+','+c[1]+','+c[2]+')';}
+  var cw=plotW/T,ch=plotH/n,s=frameStart(W,H);
+  for(var r=0;r<n;r++)for(var c=0;c<T;c++){var x=mL+c*cw,y=mT+r*ch;s+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+cw.toFixed(2)+'" height="'+ch.toFixed(2)+'" fill="'+colFor(vals[r][c])+'" stroke="#fff" stroke-width="0.5"/>';}
+  // series labels
+  S.forEach((ser,r)=>{s+='<text x="'+(mL-8)+'" y="'+(mT+r*ch+ch/2+4).toFixed(1)+'" text-anchor="end" font-family="Arial" font-size="'+f(11.5)+'">'+escHtml(ser.name)+'</text>';});
+  // time labels (subset)
+  var stepLab=Math.ceil(T/10);
+  times.forEach((t,c)=>{if(c%stepLab)return;s+='<text x="'+(mL+c*cw+cw/2).toFixed(1)+'" y="'+(mT+plotH+16)+'" text-anchor="middle" font-family="Arial" font-size="'+f(11)+'">'+fmtTick(t)+'</text>';});
+  // colorbar
+  var cbX=W-mR+14,cbY=mT,cbW=12,cbH=plotH;
+  for(var i=0;i<40;i++){var t=i/39,v=vmin+(vmax-vmin)*(1-t);s+='<rect x="'+cbX+'" y="'+(cbY+t*cbH).toFixed(1)+'" width="'+cbW+'" height="'+(cbH/40+0.6).toFixed(1)+'" fill="'+colFor(v)+'"/>';}
+  s+='<rect x="'+cbX+'" y="'+cbY+'" width="'+cbW+'" height="'+cbH+'" fill="none" stroke="#000" stroke-width="'+(LW*0.8)+'"/>';
+  s+='<text x="'+(cbX+cbW+4)+'" y="'+(cbY+6)+'" font-family="Arial" font-size="'+f(10)+'">'+fmtTick(vmax)+'</text>';
+  s+='<text x="'+(cbX+cbW+4)+'" y="'+(cbY+cbH)+'" font-family="Arial" font-size="'+f(10)+'">'+fmtTick(vmin)+'</text>';
+  s+='<text x="'+(W/2)+'" y="'+(mT-14)+'" text-anchor="middle" font-family="Arial" font-size="'+f(18)+'" font-weight="700" font-style="italic">'+escHtml(document.getElementById('titleIn').value)+'</text>';
+  s+='<text x="'+(mL+plotW/2)+'" y="'+(H-10)+'" text-anchor="middle" font-family="Arial" font-size="'+f(13)+'" font-weight="700">'+escHtml(document.getElementById('xlabIn').value)+'</text>';
+  document.getElementById('sizeHint').textContent='Output: '+W+' × '+H+' px (heatmap)';
+  return svgWrap(W,H,s);
+}
+
+function buildFacetSVG(S){
+  var FS=cfg.fs,LW=cfg.lw,W=cfg.W;
+  var n=S.length,cols=Math.min(n,n<=3?n:(n<=8?Math.ceil(Math.sqrt(n)):3)),rows=Math.ceil(n/cols);
+  var H=Math.round(W/cfg.ar*Math.max(1,rows*0.62));
+  var f=px=>(px*FS).toFixed(1);
+  var ext=dataExtent(S);
+  if(!ext.xs.length)return emptySVG(W,H,40,50,W-80,H-80);
+  var xMin=Math.min.apply(null,ext.xs),xMax=Math.max.apply(null,ext.xs),yMin=Math.min.apply(null,ext.ys),yMax=Math.max.apply(null,ext.ys);
+  var xa=axisTicks(xMin,xMax,4),ya=axisTicks(Math.min(0,yMin),yMax,4);
+  var s=frameStart(W,H);
+  var gw=W/cols,gh=H/rows,padL=46*FS,padR=12,padT=26*FS,padB=30*FS;
+  S.forEach((ser,si)=>{
+    var gx0=(si%cols)*gw,gy0=Math.floor(si/cols)*gh;
+    var mL=gx0+padL,mT=gy0+padT,plotW=gw-padL-padR,plotH=gh-padT-padB;
+    function X(t){return mL+(t-xa.lo)/(xa.hi-xa.lo)*plotW;}
+    function Y(v){return mT+plotH-(v-ya.lo)/(ya.hi-ya.lo)*plotH;}
+    s+='<line x1="'+mL+'" y1="'+mT+'" x2="'+mL+'" y2="'+(mT+plotH)+'" stroke="#000" stroke-width="'+(LW*1.1)+'"/>';
+    s+='<line x1="'+mL+'" y1="'+(mT+plotH)+'" x2="'+(mL+plotW)+'" y2="'+(mT+plotH)+'" stroke="#000" stroke-width="'+(LW*1.1)+'"/>';
+    ya.ticks.forEach(t=>{if(t<ya.lo-1e-9||t>ya.hi+1e-9)return;var y=Y(t);s+='<line x1="'+(mL-4)+'" y1="'+y.toFixed(1)+'" x2="'+mL+'" y2="'+y.toFixed(1)+'" stroke="#000" stroke-width="'+(LW*0.9)+'"/><text x="'+(mL-6)+'" y="'+(y+3).toFixed(1)+'" text-anchor="end" font-family="Arial" font-size="'+f(9.5)+'">'+fmtTick(t)+'</text>';});
+    xa.ticks.forEach(t=>{if(t<xa.lo-1e-9||t>xa.hi+1e-9)return;var x=X(t);s+='<line x1="'+x.toFixed(1)+'" y1="'+(mT+plotH)+'" x2="'+x.toFixed(1)+'" y2="'+(mT+plotH+4)+'" stroke="#000" stroke-width="'+(LW*0.9)+'"/><text x="'+x.toFixed(1)+'" y="'+(mT+plotH+15)+'" text-anchor="middle" font-family="Arial" font-size="'+f(9.5)+'">'+fmtTick(t)+'</text>';});
+    var col=seriesColor(si,n);
+    if(cfg.band!=='none'&&ser.pts.some(p=>p.n>=2)){var up='',dn='';ser.pts.forEach((p,i)=>{var h=seriesBandHalf(p);up+=(i?' L':'M')+X(p.t).toFixed(1)+','+Y(p.mean+h).toFixed(1);});for(var i=ser.pts.length-1;i>=0;i--){var p=ser.pts[i],h=seriesBandHalf(p);dn+=' L'+X(p.t).toFixed(1)+','+Y(p.mean-h).toFixed(1);}var rgb=cfg.color==='color'?hexToRgb(col):[110,110,110];s+='<path d="'+up+dn+' Z" fill="rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+',0.16)"/>';}
+    var d='';ser.pts.forEach((p,i)=>{d+=(i?' L':'M')+X(p.t).toFixed(1)+','+Y(p.mean).toFixed(1);});
+    s+='<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="'+(LW*1.8)+'" stroke-linejoin="round"/>';
+    if(document.getElementById('markersChk').checked)ser.pts.forEach(p=>{s+='<circle cx="'+X(p.t).toFixed(1)+'" cy="'+Y(p.mean).toFixed(1)+'" r="'+(2.4*Math.sqrt(FS)).toFixed(1)+'" fill="#fff" stroke="'+col+'" stroke-width="'+(LW*1.2)+'"/>';});
+    s+='<text x="'+(gx0+gw/2).toFixed(1)+'" y="'+(gy0+padT-8).toFixed(1)+'" text-anchor="middle" font-family="Arial" font-size="'+f(11.5)+'" font-weight="700">'+escHtml(ser.name)+'</text>';
+  });
+  document.getElementById('sizeHint').textContent='Output: '+W+' × '+H+' px (small multiples)';
+  return svgWrap(W,H,s);
+}
+
+/* ---- shared svg fragments ---- */
+function frameStart(W,H){return '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="#ffffff"/>';}
+function svgWrap(W,H,s){return '<svg id="theSVG" xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+s+'</svg>';}
+function emptySVG(W,H,mT,mL,plotW,plotH){return svgWrap(W,H,frameStart(W,H)+'<text x="'+(W/2)+'" y="'+(H/2)+'" text-anchor="middle" font-family="Arial" font-size="14" fill="#888">Enter numeric data to plot</text>');}
+function axes(mL,mT,plotW,plotH,xa,ya,X,Y,f,FS,LW){
+  var aw=(LW*1.4).toFixed(2),bw=(LW*1.0).toFixed(2),s='';
+  s+='<line x1="'+mL+'" y1="'+mT+'" x2="'+mL+'" y2="'+(mT+plotH)+'" stroke="#000" stroke-width="'+aw+'"/>';
+  s+='<line x1="'+mL+'" y1="'+(mT+plotH)+'" x2="'+(mL+plotW)+'" y2="'+(mT+plotH)+'" stroke="#000" stroke-width="'+aw+'"/>';
+  ya.ticks.forEach(t=>{if(t<ya.lo-1e-9||t>ya.hi+1e-9)return;var y=Y(t);s+='<line x1="'+(mL-5)+'" y1="'+y.toFixed(1)+'" x2="'+mL+'" y2="'+y.toFixed(1)+'" stroke="#000" stroke-width="'+bw+'"/>';s+='<line x1="'+mL+'" y1="'+y.toFixed(1)+'" x2="'+(mL+plotW)+'" y2="'+y.toFixed(1)+'" stroke="#eef1f4" stroke-width="'+bw+'"/>';s+='<text x="'+(mL-9)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-family="Arial" font-size="'+f(12)+'">'+fmtTick(t)+'</text>';});
+  xa.ticks.forEach(t=>{if(t<xa.lo-1e-9||t>xa.hi+1e-9)return;var x=X(t);s+='<line x1="'+x.toFixed(1)+'" y1="'+(mT+plotH)+'" x2="'+x.toFixed(1)+'" y2="'+(mT+plotH+5)+'" stroke="#000" stroke-width="'+bw+'"/>';s+='<text x="'+x.toFixed(1)+'" y="'+(mT+plotH+18)+'" text-anchor="middle" font-family="Arial" font-size="'+f(12)+'">'+fmtTick(t)+'</text>';});
+  return s;
+}
+function titleAndLabels(W,H,mT,mL,plotW,plotH,FS,f){var s='';
+  s+='<text x="'+(W/2)+'" y="'+(mT-14)+'" text-anchor="middle" font-family="Arial" font-size="'+f(18)+'" font-weight="700" font-style="italic">'+escHtml(document.getElementById('titleIn').value)+'</text>';
+  s+='<text transform="translate('+(mL-44*FS)+','+(mT+plotH/2)+') rotate(-90)" text-anchor="middle" font-family="Arial" font-size="'+f(13)+'" font-weight="700">'+escHtml(document.getElementById('ylabIn').value)+'</text>';
+  s+='<text x="'+(mL+plotW/2)+'" y="'+(H-10)+'" text-anchor="middle" font-family="Arial" font-size="'+f(13)+'" font-weight="700">'+escHtml(document.getElementById('xlabIn').value)+'</text>';
+  return s;}
+function legendBox(S,mL,mR,mT,plotW,FS,LW,f,kind){
+  var n=S.length,lh=Math.max(15,17*FS),pad=6*FS,swW=18*FS;
+  var nameW=Math.max.apply(null,S.map(s=>s.name.length))*6.3*FS;
+  var boxW=swW+8+nameW+pad*2,boxH=n*lh+pad*2,lx=mL+plotW-boxW-6,ly=mT+6,s='';
+  s+='<rect x="'+lx.toFixed(1)+'" y="'+ly+'" width="'+boxW.toFixed(1)+'" height="'+boxH.toFixed(1)+'" fill="#ffffff" stroke="#999" stroke-width="'+(0.8*LW)+'" rx="4" fill-opacity="0.92"/>';
+  S.forEach((ser,si)=>{var ey=ly+pad+si*lh+lh/2,col=seriesColor(si,n);
+    if(kind==='area')s+='<rect x="'+(lx+pad)+'" y="'+(ey-5)+'" width="'+swW.toFixed(1)+'" height="10" fill="'+col+'" fill-opacity="0.8" stroke="#000" stroke-width="'+(0.7*LW)+'"/>';
+    else s+='<line x1="'+(lx+pad)+'" y1="'+ey.toFixed(1)+'" x2="'+(lx+pad+swW)+'" y2="'+ey.toFixed(1)+'" stroke="'+col+'" stroke-width="'+(LW*2)+'"'+(seriesDash(si)?' stroke-dasharray="'+seriesDash(si)+'"':'')+'/><circle cx="'+(lx+pad+swW/2)+'" cy="'+ey.toFixed(1)+'" r="'+(2.6*Math.sqrt(FS)).toFixed(1)+'" fill="#fff" stroke="'+col+'" stroke-width="'+(LW*1.2)+'"/>';
+    s+='<text x="'+(lx+pad+swW+6)+'" y="'+(ey+4).toFixed(1)+'" font-family="Arial" font-size="'+f(12)+'">'+escHtml(ser.name)+'</text>';});
+  return s;
+}
+
+/* ===================== AUTO-RECOMMENDATION ===================== */
+function anLabel(v){var L={trend:'Linear trend regression',timepoint:'Per-timepoint comparison',auc:'Area under curve (AUC)',twoway:'Two-way ANOVA (time × series)',acf:'Autocorrelation (ACF)',corr:'Series correlation'};if(repeated){L.trend='Per-subject trend (random slopes)';L.twoway='Repeated-measures ANOVA (Time × Series)';}return L[v];}
+// inspect the data shape and recommend the most appropriate analysis + test
+function recommend(S){
+  var withData=S.filter(s=>s.pts.length>0),nS=withData.length;
+  var tset={};withData.forEach(s=>s.pts.forEach(p=>tset[p.t]=1));var T=Object.keys(tset).length;
+  var maxN=0,anyRep=false;withData.forEach(s=>s.pts.forEach(p=>{maxN=Math.max(maxN,p.n);if(p.n>=2)anyRep=true;}));
+  var dense=T>=12;
+  // balance diagnostics across the series × union-time grid
+  var utimes=Object.keys(tset).map(Number),counts=[],emptyCell=false;
+  withData.forEach(s=>{var m={};s.pts.forEach(p=>m[p.t]=p.n);utimes.forEach(t=>{var nn=m[t]||0;if(nn===0)emptyCell=true;else counts.push(nn);});});
+  var unbalanced=counts.length>1&&counts.some(x=>x!==counts[0]);
+  var balanceWarn=(nS>=2&&anyRep&&(emptyCell||unbalanced));
+  var an='trend',tp=null,why;
+  if(nS===0){why='Enter data to get a recommendation.';return{an:'trend',tp:null,why:why,T:T,nS:nS,anyRep:anyRep,dense:dense};}
+  if(repeated){
+    if(T>=2&&maxN>=2){an='twoway';tp=null;why='Repeated-measures mode is on with subjects tracked over time — use <b>repeated-measures ANOVA</b> (Time within-subject × Series between-subject) to test whether '+(nS>1?'the groups follow different trajectories (Time × Series)':'values change over time')+', accounting for each subject\'s own baseline. <b>Per-subject trend</b> tests the rate of change.';}
+    else{an='trend';tp=null;why='Repeated-measures mode is on, but there are too few complete subjects/timepoints — fit a <b>per-subject trend</b>, or add subjects with values at every timepoint to enable the mixed ANOVA.';}
+    return{an:an,tp:tp,why:why,T:T,nS:nS,anyRep:anyRep,dense:dense,balanceWarn:balanceWarn,emptyCell:emptyCell,unbalanced:unbalanced};
+  }
+  if(anyRep&&nS>=2){
+    an='twoway';tp=nS>2?'anova':'ttest';
+    why='You have <b>'+nS+' series with replicates</b> across '+T+' timepoints. Use <b>two-way ANOVA</b> to test the time×series interaction (do the groups diverge over time?), then localise differences with <b>per-timepoint '+(nS>2?'one-way ANOVA':'Welch t-tests')+'</b> ('+nS+(nS>2?' series → ANOVA':' series → t-test')+'). For total response use AUC.';
+  } else if(anyRep&&nS===1){
+    an='trend';why='Single series with replicates — fit a <b>linear trend</b> to test for change over time'+(dense?', and check <b>autocorrelation</b> for periodicity.':'.');
+  } else if(!anyRep&&dense){
+    an='trend';why='Dense single-observation signal ('+T+' timepoints, no replicates) — use <b>trend regression</b> for direction and <b>autocorrelation (ACF)</b> to detect serial structure/cycles. Replicate-based tests (ANOVA/t/AUC) are not applicable without repeats.';
+  } else {
+    an='trend';why='Few points without replicates — a <b>linear trend</b> is the most robust summary. Add replicates per timepoint to unlock group comparisons (t-test/ANOVA/AUC).';
+  }
+  return{an:an,tp:tp,why:why,T:T,nS:nS,anyRep:anyRep,dense:dense,balanceWarn:balanceWarn,emptyCell:emptyCell,unbalanced:unbalanced};
+}
+var _reco=null;
+function renderReco(S){
+  _reco=recommend(S);var box=document.getElementById('recoBox');if(!box)return;
+  var cur=document.getElementById('analysisSel').value,match=cur===_reco.an;
+  var tpName=_reco.tp?(_reco.tp==='anova'?' · ANOVA':' · Welch t'):'';
+  var html='<b>Recommended:</b> '+anLabel(_reco.an)+tpName+' — '+_reco.why+
+    (match?'<span class="okmark">✓ in use</span>':'<button onclick="applyReco()">Apply</button>');
+  if(_reco.balanceWarn){
+    var pyModel=repeated?'mixed_ri':'anova3', pyName=repeated?'mixed-effects model':'Type III ANOVA';
+    var problem=_reco.emptyCell?'has <b>empty series×time cells</b>':'is <b>unbalanced</b> (unequal replicate counts)';
+    html+='<div style="margin-top:8px;border-top:1px solid rgba(0,0,0,.12);padding-top:7px">'+
+      '<b>Design note:</b> your design '+problem+'. The built-in '+(repeated?'repeated-measures ANOVA drops incomplete subjects':'two-way ANOVA falls back to sequential (Type I) sums of squares')+
+      ', so results are approximate. For a rigorous, order-independent analysis use the Python '+pyName+
+      '. <button onclick="useAdvancedModel(\''+pyModel+'\')">'+(pyodide?'Run Python '+pyName:'Load &amp; run Python '+pyName)+'</button></div>';
+  }
+  box.innerHTML=html;
+}
+function applyReco(){if(!_reco)return;document.getElementById('analysisSel').value=_reco.an;if(_reco.tp)document.getElementById('tpTestSel').value=_reco.tp;showAnBlocks();updateTpRefVis();update();}
+// load (if needed) the Python engine and run a given model — used by the design-note shortcut
+async function useAdvancedModel(model){
+  var panel=document.getElementById('pyPanel');if(panel&&panel.scrollIntoView)panel.scrollIntoView({behavior:'smooth',block:'center'});
+  if(!pyodide){await loadPyEngine();}
+  if(!pyodide)return; // load failed; status already shows the error
+  var sel=document.getElementById('pyModel');if(sel){sel.value=model;updatePyModelHint();}
+  runPy();
+}
+
+/* ===================== ANALYSIS DRIVER ===================== */
+var lastResult=null;
+function runAnalysis(S){
+  var type=document.getElementById('analysisSel').value;
+  if(repeated&&type==='twoway')return {type:'rmanova',rm:rmANOVA(computeRMData())};
+  if(repeated&&type==='trend')return {type:'rmtrend',rt:rmTrend(computeRMData())};
+  if(type==='trend')return {type:type,rows:S.map(ser=>{var x=[],y=[];ser.pts.forEach(p=>p.reps.forEach(r=>{x.push(p.t);y.push(r);}));return{name:ser.name,lr:linreg(x,y)};})};
+  if(type==='auc'){
+    var ref=+document.getElementById('aucRefSel').value||0;
+    var aucs=S.map(ser=>{var perRep=[];for(var r=0;r<nRep;r++){var xs=[],ys=[];ser.pts.forEach(p=>{if(p.reps[r]!==undefined&&isFinite(p.reps[r])){xs.push(p.t);ys.push(p.reps[r]);}});if(xs.length>=2)perRep.push(trapAUC(xs,ys));}var mx=ser.pts.map(p=>p.t),my=ser.pts.map(p=>p.mean);return{name:ser.name,meanAUC:mx.length>=2?trapAUC(mx,my):null,perRep:perRep};});
+    var refA=aucs[ref];
+    aucs.forEach((a,i)=>{a.cmp=null;if(i!==ref&&refA&&a.perRep.length>=2&&refA.perRep.length>=2)a.cmp=welch(a.perRep,refA.perRep);});
+    return{type:type,ref:ref,rows:aucs};
+  }
+  if(type==='timepoint'){
+    var test=document.getElementById('tpTestSel').value,adj=document.getElementById('tpAdjSel').value,refS=+document.getElementById('tpRefSel').value||0;
+    var tset={};S.forEach(s=>s.pts.forEach(p=>tset[p.t]=1));var times=Object.keys(tset).map(Number).sort((a,b)=>a-b);
+    var raws=[],rows=[];
+    times.forEach(t=>{
+      var groups=S.map(ser=>{var p=ser.pts.find(q=>q.t===t);return p?p.reps:[];});
+      if(test==='anova'){var valid=groups.filter(g=>g.length>=2);if(valid.length>=2){var a=anova(valid);rows.push({t:t,kind:'anova',F:a.F,dfb:a.dfb,dfw:a.dfw,praw:a.p});raws.push(a.p);}else{rows.push({t:t,kind:'anova',praw:NaN});raws.push(1);}}
+      else{var a=groups[refS],ok=[];S.forEach((ser,i)=>{if(i===refS)return;var b=groups[i];if(a&&b&&a.length>=2&&b.length>=2){var w=welch(b,a);ok.push({i:i,w:w});}});rows.push({t:t,kind:'tt',pairs:ok});ok.forEach(o=>raws.push(o.w.p));}
+    });
+    var adjAll=adj==='none'?raws.slice():adjustP(raws,adj);
+    // map adjusted back
+    var k=0;rows.forEach(r=>{if(r.kind==='anova'){r.padj=adjAll[k++];}else{r.pairs.forEach(o=>{o.padj=adjAll[k++];});}});
+    return{type:type,test:test,adj:adj,refS:refS,rows:rows};
+  }
+  if(type==='twoway'){
+    var tset={};S.forEach(s=>s.pts.forEach(p=>tset[p.t]=1));var times=Object.keys(tset).map(Number).sort((a,b)=>a-b);
+    var cells=times.map(t=>S.map(ser=>{var p=ser.pts.find(q=>q.t===t);return p?p.reps:[];}));
+    return{type:type,aov:twoWayANOVA(cells,times.length,S.length)};
+  }
+  if(type==='acf'){
+    var si=+document.getElementById('acfSeriesSel').value||0,maxLag=+document.getElementById('acfLagIn').value;
+    var ser=S[si];var y=ser.pts.map(p=>p.mean);maxLag=Math.min(maxLag,Math.max(1,y.length-1));
+    return{type:type,name:ser?ser.name:'',acf:y.length>=3?acf(y,maxLag):null,n:y.length};
+  }
+  if(type==='corr'){
+    var ai=+document.getElementById('corrA').value||0,bi=+document.getElementById('corrB').value||0,method=document.getElementById('corrMethod').value;
+    var A=S[ai],B=S[bi],xs=[],ys=[];
+    if(A&&B){var bmap={};B.pts.forEach(p=>bmap[p.t]=p.mean);A.pts.forEach(p=>{if(bmap[p.t]!==undefined){xs.push(p.mean);ys.push(bmap[p.t]);}});}
+    var res=method==='spearman'?spearman(xs,ys):pearson(xs,ys);
+    return{type:type,method:method,a:A?A.name:'',b:B?B.name:'',n:xs.length,res:res};
+  }
+}
+
+/* ===================== RESULTS TABLE ===================== */
+function renderResults(S,R){
+  var box=document.getElementById('stats'),notes=document.getElementById('methodNotes'),html='';
+  if(!R){box.innerHTML='<p class="hint">No analysis.</p>';return;}
+  if(R.type==='trend'){
+    html+='<table><tr><th>Series</th><th>slope</th><th>R²</th><th>t</th><th>df</th><th>p</th><th></th></tr>';
+    R.rows.forEach(r=>{if(!r.lr){html+='<tr><td>'+escHtml(r.name)+'</td><td colspan="6" class="hint">need ≥2 points</td></tr>';return;}var l=r.lr;html+='<tr><td>'+escHtml(r.name)+'</td><td>'+l.slope.toPrecision(3)+'</td><td>'+l.r2.toFixed(3)+'</td><td>'+l.t.toFixed(2)+'</td><td>'+l.df+'</td><td>'+fmtP(l.p)+'</td><td class="sig">'+stars(l.p)+'</td></tr>';});
+    html+='</table>';
+    notes.innerHTML='Ordinary least-squares regression of value on time, fitted on individual replicate observations. Slope = change in value per unit time; p tests slope ≠ 0 (t with n−2 df). R² is the fraction of variance explained by the linear fit. Turn on "Overlay linear trend lines" to see the fits on the plot. A straight-line fit assumes the relationship is linear and residuals are roughly normal with constant variance — for curved kinetics, interpret slope as an average rate only.';
+  } else if(R.type==='auc'){
+    html+='<table><tr><th>Series</th><th>AUC (mean)</th><th>AUC reps (mean±SD)</th><th>vs ref: p</th><th></th></tr>';
+    R.rows.forEach((r,i)=>{var repTxt=r.perRep.length?(mean(r.perRep).toPrecision(4)+' ± '+(r.perRep.length>1?sd(r.perRep).toPrecision(2):'—')):'—';var pc=r.cmp?fmtP(r.cmp.p):(i===R.ref?'(ref)':'—');var st=r.cmp?stars(r.cmp.p):'';html+='<tr><td>'+escHtml(r.name)+'</td><td>'+(r.meanAUC!=null?r.meanAUC.toPrecision(4):'—')+'</td><td>'+repTxt+'</td><td>'+pc+'</td><td class="sig">'+st+'</td></tr>';});
+    html+='</table>';
+    notes.innerHTML='Area under the curve by the trapezoidal rule over the timepoints. The mean-AUC integrates the mean trajectory; per-replicate AUCs integrate each replicate series separately so they can be compared between series with a Welch t-test (needs ≥2 complete replicate curves per series). AUC summarises total exposure/response over the whole time window in a single number — useful when the shape varies but cumulative effect is the question.';
+  } else if(R.type==='timepoint'){
+    if(R.test==='anova'){
+      html+='<table><tr><th>Time</th><th>F</th><th>df</th><th>p (raw)</th><th>p (adj)</th><th></th></tr>';
+      R.rows.forEach(r=>{html+='<tr><td>'+fmtTick(r.t)+'</td><td>'+(isNaN(r.praw)?'—':r.F.toFixed(2))+'</td><td>'+(isNaN(r.praw)?'—':(r.dfb+','+r.dfw))+'</td><td>'+(isNaN(r.praw)?'—':r.praw.toFixed(4))+'</td><td>'+(r.padj==null?'—':r.padj.toFixed(4))+'</td><td class="sig">'+(r.padj==null?'':stars(r.padj))+'</td></tr>';});
+      html+='</table>';
+    } else {
+      html+='<table><tr><th>Time</th><th>Comparison</th><th>t</th><th>p (raw)</th><th>p (adj)</th><th></th></tr>';
+      R.rows.forEach(r=>{if(!r.pairs.length){html+='<tr><td>'+fmtTick(r.t)+'</td><td colspan="5" class="hint">need ≥2 reps</td></tr>';return;}r.pairs.forEach((o,k)=>{html+='<tr><td>'+(k===0?fmtTick(r.t):'')+'</td><td>'+escHtml(series[o.i])+' vs '+escHtml(series[R.refS])+'</td><td>'+o.w.t.toFixed(2)+'</td><td>'+o.w.p.toFixed(4)+'</td><td>'+(o.padj==null?'—':o.padj.toFixed(4))+'</td><td class="sig">'+(o.padj==null?'':stars(o.padj))+'</td></tr>';});});
+      html+='</table>';
+    }
+    notes.innerHTML='At each timepoint the series are compared '+(R.test==='anova'?'by one-way ANOVA across all series':'by Welch t-tests against the reference series')+'. p-values are then '+(R.adj==='none'?'<b>not</b> corrected for multiple timepoints (raises false positives)':'corrected across all timepoints by the '+R.adj+' method')+'. This answers "at which times do the series differ?" but treats timepoints as independent — for the overall time × series effect use the two-way ANOVA. Significance: ns p&gt;0.05, * ≤0.05, ** ≤0.01, *** ≤0.001.';
+  } else if(R.type==='twoway'){
+    if(!R.aov){html+='<p class="hint">Two-way ANOVA needs ≥2 timepoints, ≥2 series, and replicates (more observations than time×series cells).</p>';}
+    else{var a=R.aov;function r3(o,nm){if(!o)return '<tr><td>'+nm+'</td><td colspan="6" class="hint">not estimable with the present missing cells</td></tr>';return '<tr><td>'+nm+'</td><td>'+o.df+'</td><td>'+o.ss.toPrecision(4)+'</td><td>'+o.ms.toPrecision(4)+'</td><td>'+(o.F!=null?o.F.toFixed(2):'')+'</td><td>'+(o.p!=null?fmtP(o.p):'')+'</td><td class="sig">'+(o.p!=null?stars(o.p):'')+'</td></tr>';}
+      html+='<table><tr><th>Source</th><th>df</th><th>SS</th><th>MS</th><th>F</th><th>p</th><th></th></tr>';
+      html+=r3(a.time,'Time')+r3(a.series,'Series')+r3(a.inter,'Time × Series')+'<tr><td>Residual</td><td>'+a.error.df+'</td><td>'+a.error.ss.toPrecision(4)+'</td><td>'+a.error.ms.toPrecision(4)+'</td><td></td><td></td><td></td></tr>';
+      html+='</table>';
+      if(a.emptyCells)html+='<div class="hint" style="color:#c05621">⚠ Some series×time cells have no data, so this is an unbalanced design with empty cells: the sums of squares are sequential (Type I) and the interaction df is reduced. Treat these p-values as approximate — for a rigorous unbalanced analysis use the Python <b>Type III ANOVA</b> (card 2b).</div>';
+    }
+    notes.innerHTML='Two-way ANOVA partitions variation into a main effect of <b>time</b>, a main effect of <b>series</b>, and their <b>interaction</b>. The interaction is usually the key time-course question: a significant Time × Series term means the series follow <i>different shapes</i> over time (they diverge), not merely sit at different levels. Assumes normal residuals and similar variance across cells; a fixed-effects model is used (timepoints treated as categorical levels).';
+  } else if(R.type==='rmanova'){
+    var a=R.rm;
+    if(a.error){html+='<p class="hint">'+a.error+'</p>';}
+    else{
+      function rrow(o,nm){return o?('<tr><td>'+nm+'</td><td>'+o.df+'</td><td>'+o.ss.toPrecision(4)+'</td><td>'+o.ms.toPrecision(4)+'</td><td>'+o.F.toFixed(2)+'</td><td>'+fmtP(o.p)+'</td><td class="sig">'+stars(o.p)+'</td></tr>'):'';}
+      html+='<table><tr><th>Source</th><th>df</th><th>SS</th><th>MS</th><th>F</th><th>p</th><th></th></tr>';
+      html+='<tr><td colspan="7" style="color:var(--muted);font-size:11px;padding-top:6px">Between subjects</td></tr>';
+      html+=rrow(a.series,'Series (group)');
+      html+='<tr><td>Subject (within series)</td><td>'+a.subj.df+'</td><td>'+a.subj.ss.toPrecision(4)+'</td><td>'+(isNaN(a.subj.ms)?'—':a.subj.ms.toPrecision(4))+'</td><td colspan="3" style="color:var(--muted)">← error for Series</td></tr>';
+      html+='<tr><td colspan="7" style="color:var(--muted);font-size:11px;padding-top:6px">Within subjects (over time)</td></tr>';
+      html+=rrow(a.time,'Time');
+      html+=rrow(a.inter,'Time × Series');
+      html+='<tr><td>Time × Subject</td><td>'+a.tsubj.df+'</td><td>'+a.tsubj.ss.toPrecision(4)+'</td><td>'+(isNaN(a.tsubj.ms)?'—':a.tsubj.ms.toPrecision(4))+'</td><td colspan="3" style="color:var(--muted)">← error for Time terms</td></tr>';
+      html+='</table>';
+      html+='<div class="hint">Subjects used: '+a.used.map(u=>escHtml(u.name)+' n='+u.n).join(', ')+(a.dropped.some(d=>d.d>0)?'. <span style="color:#c05621">Dropped (incomplete): '+a.dropped.filter(d=>d.d>0).map(d=>escHtml(d.name)+' ×'+d.d).join(', ')+'</span>':'')+'</div>';
+    }
+    notes.innerHTML='<b>Repeated-measures (mixed) ANOVA — split-plot design.</b> Each subject (a replicate column) is followed across all timepoints, so Time is a <i>within-subject</i> factor and Series is a <i>between-subject</i> factor, with a random intercept per subject. The model uses the correct error terms: the <b>Subject-within-series</b> term tests the Series (group) effect, and the <b>Time × Subject</b> term tests the Time and Time × Series effects — this is what accounts for the correlation between repeated measurements on the same subject. A significant <b>Time × Series</b> means the groups follow different trajectories over time. Requirements: balanced/complete subjects (each used subject has a value at every timepoint; incomplete ones are dropped). Assumes normal residuals and sphericity (equal variance of timepoint differences); with strong sphericity violations a Greenhouse–Geisser correction would be the next refinement.';
+  } else if(R.type==='rmtrend'){
+    var rt=R.rt;
+    html+='<table><tr><th>Series</th><th>subjects</th><th>mean slope</th><th>SD</th><th>t</th><th>df</th><th>p (slope≠0)</th><th></th></tr>';
+    rt.rows.forEach(r=>{if(r.p!=null)html+='<tr><td>'+escHtml(r.name)+'</td><td>'+r.nSub+'</td><td>'+r.meanSlope.toPrecision(3)+'</td><td>'+r.sdSlope.toPrecision(2)+'</td><td>'+r.t.toFixed(2)+'</td><td>'+r.df+'</td><td>'+fmtP(r.p)+'</td><td class="sig">'+stars(r.p)+'</td></tr>';else html+='<tr><td>'+escHtml(r.name)+'</td><td>'+r.nSub+'</td><td colspan="6" class="hint">need ≥2 complete subjects</td></tr>';});
+    html+='</table>';
+    if(rt.groupCmp)html+='<p style="margin:8px 0 0"><b>Slopes differ between series?</b> One-way ANOVA on per-subject slopes: F('+rt.groupCmp.dfb+', '+rt.groupCmp.dfw+') = '+rt.groupCmp.F.toFixed(2)+', '+fmtP(rt.groupCmp.p)+' <span class="sig">'+stars(rt.groupCmp.p)+'</span></p>';
+    notes.innerHTML='<b>Per-subject trend (random slopes).</b> A separate linear slope (change per unit time) is fitted for <i>each subject</i>, then the slopes are treated as the data. For each series a one-sample t-test asks whether the average within-subject slope differs from zero (is the group changing over time?), and a one-way ANOVA on the slopes asks whether the rate of change differs between series. Using one slope per subject correctly respects that repeated measurements on a subject are not independent — it is a simple, robust mixed-effects approach. Needs ≥2 complete subjects per series.';
+  } else if(R.type==='acf'){
+    if(!R.acf){html+='<p class="hint">Need ≥3 timepoints.</p>';}
+    else{html+='<table><tr><th>Lag</th><th>ACF</th><th>bar</th></tr>';var ci=1.96/Math.sqrt(R.n);R.acf.forEach((v,L)=>{var w=Math.abs(v)*60,sigm=L>0&&Math.abs(v)>ci;html+='<tr><td>'+L+'</td><td>'+v.toFixed(3)+(sigm?' <span class="sig">•</span>':'')+'</td><td><span style="display:inline-block;height:9px;background:'+(v>=0?'#2b6cb0':'#c0392b')+';width:'+w.toFixed(0)+'px"></span></td></tr>';});html+='</table><div class="hint">Dashed 95% band ≈ ±'+ci.toFixed(3)+'; • marks lags outside it.</div>';}
+    notes.innerHTML='Autocorrelation measures how each value of <b>'+escHtml(R.name)+'</b> correlates with itself a given number of timepoints earlier (the lag). Lag 0 is always 1. Bars beyond the ±1.96/√n band suggest real temporal structure (trend or periodicity) rather than noise — e.g. a slowly decaying ACF indicates a trend, an oscillating ACF indicates a cycle. Computed on the mean trajectory; assumes roughly even time spacing.';
+  } else if(R.type==='corr'){
+    if(!R.res){html+='<p class="hint">Need ≥3 shared timepoints between the two series.</p>';}
+    else{var c=R.res,coef=R.method==='spearman'?c.rho:c.r;html+='<table><tr><th>Pair</th><th>'+(R.method==='spearman'?'ρ (rho)':'r')+'</th><th>n</th><th>p</th><th></th></tr><tr><td>'+escHtml(R.a)+' ~ '+escHtml(R.b)+'</td><td>'+coef.toFixed(3)+'</td><td>'+R.n+'</td><td>'+fmtP(c.p)+'</td><td class="sig">'+stars(c.p)+'</td></tr></table>';}
+    notes.innerHTML=(R.method==='spearman'?'Spearman rank correlation (monotonic association, robust to outliers and non-linearity)':'Pearson correlation (strength of the linear relationship)')+' between the two series\' mean values at shared timepoints. Note: correlated time-series often share a common trend, which can inflate correlation ("spurious regression") — a high value does not by itself imply a direct link. n is the number of shared timepoints.';
+  }
+  box.innerHTML=html;
+}
+
+/* ===================== EXPLANATION CARD ===================== */
+var REFS={
+ student:"Student. (1908). The probable error of a mean. <i>Biometrika, 6</i>(1), 1–25.",
+ welch:"Welch, B. L. (1947). The generalization of ‘Student’s’ problem when several different population variances are involved. <i>Biometrika, 34</i>(1–2), 28–35.",
+ fisher:"Fisher, R. A. (1925). <i>Statistical methods for research workers.</i> Oliver &amp; Boyd.",
+ holm:"Holm, S. (1979). A simple sequentially rejective multiple test procedure. <i>Scandinavian Journal of Statistics, 6</i>(2), 65–70.",
+ spearman:"Spearman, C. (1904). The proof and measurement of association between two things. <i>American Journal of Psychology, 15</i>(1), 72–101.",
+ boxjenkins:"Box, G. E. P., &amp; Jenkins, G. M. (1970). <i>Time series analysis: Forecasting and control.</i> Holden-Day.",
+ yule:"Yule, G. U. (1926). Why do we sometimes get nonsense-correlations between time-series? <i>Journal of the Royal Statistical Society, 89</i>(1), 1–63.",
+ tukeyEDA:"Tukey, J. W. (1977). <i>Exploratory data analysis.</i> Addison-Wesley."
+};
+function updateExplain(){
+  var type=document.getElementById('analysisSel').value,refs=[],h='';
+  var title=anLabel(type);
+  h+='<p style="margin:0 0 6px"><b>Now showing:</b> '+title+(repeated?' <span class="tag">repeated-measures</span>':'')+'</p>';
+  h+='<p><b>Reading a time-series plot.</b> The line is the mean trajectory at each timepoint; the shaded band shows its uncertainty (±SEM, ±SD, or a 95% CI). A band that does not overlap between two series at a timepoint is suggestive — but is not a formal test — of a difference there.</p>';refs.push('tukeyEDA');
+  if(repeated){
+    h+='<p><b>Repeated-measures mode is ON.</b> Every replicate column is treated as one <i>subject</i> followed across all timepoints (column S1 = the same individual at every row). Analyses use each subject\'s own baseline (random effect) so within-subject correlation is handled — ignoring it (ordinary ANOVA) typically overstates significance.</p>';refs.push('fisher');
+  }
+  // analysis-specific description + references (always corresponds to the running analysis)
+  if(type==='trend'){
+    if(repeated){h+='<p><b>Per-subject trend (random slopes).</b> A separate linear slope (change per unit time) is fitted for <i>each subject</i>; then a one-sample t-test asks whether the group\'s average slope differs from zero, and a one-way ANOVA on the slopes asks whether the rate of change differs between series. Using one slope per subject respects the within-subject correlation — a simple, robust mixed-effects approach.</p>';refs.push('student','fisher');}
+    else{h+='<p><b>Linear trend regression</b> fits a straight line value = a + b·time by least squares and tests whether the slope b differs from zero. The simplest way to ask "is this going up or down over time, and is that real?" Use it when you expect a roughly monotonic change; for clearly curved data the slope is only an average rate.</p>';refs.push('fisher','student');}
+  }
+  else if(type==='twoway'){
+    if(repeated){h+='<p><b>Repeated-measures (mixed) ANOVA.</b> A split-plot model: Series is between-subjects (tested against subject-to-subject variation), Time is within-subjects (tested against the Time × Subject variation), with a random intercept per subject. The key term is <b>Time × Series</b> — significant means the groups change differently over time.</p>';refs.push('fisher');}
+    else{h+='<p><b>Two-way ANOVA (time × series)</b> is the omnibus test for a time-course with groups. It separates a time effect, a series effect, and — most importantly — their <b>interaction</b>. A significant interaction is the formal version of "the groups respond differently over time." Follow a significant interaction with per-timepoint comparisons to localise it. With unequal n the sums of squares are sequential (Type I); for a fully unbalanced design use the Python Type III ANOVA.</p>';refs.push('fisher');}
+  }
+  else if(type==='timepoint'){var tt=document.getElementById('tpTestSel').value,adj=document.getElementById('tpAdjSel').value;h+='<p><b>Per-timepoint comparison.</b> At every timepoint the series are compared '+(tt==='anova'?'by one-way ANOVA across all series':'by Welch t-tests against the reference series')+', and the p-values are then '+(adj==='none'?'left uncorrected':'corrected across all timepoints by the '+adj+' method')+'. It localises <i>when</i> series differ, but treats timepoints as independent — prefer the '+(repeated?'repeated-measures':'two-way')+' ANOVA for the overall claim.</p>';refs.push('welch');if(adj==='holm')refs.push('holm');}
+  else if(type==='auc'){h+='<p><b>Area under the curve.</b> Each '+(repeated?'subject\'s':'replicate\'s')+' trajectory is integrated by the trapezoidal rule, collapsing the whole time-course into one number (total response/exposure); AUCs are then compared between series with a Welch t-test. A clean way to ask "was the overall response bigger?" without modelling the exact shape — standard in pharmacokinetics and dose-response kinetics.</p>';refs.push('welch');}
+  else if(type==='acf'){h+='<p><b>Autocorrelation (ACF)</b> asks how predictable a series is from its own past: each bar is the correlation between the series and a lagged copy of itself. Bars outside the ±1.96/√n band indicate genuine temporal structure — a slow decay flags a trend, a wave flags periodicity, near-zero everywhere flags white noise. The standard first diagnostic in classical time-series analysis; computed on the group mean trajectory.</p>';refs.push('boxjenkins');}
+  else if(type==='corr'){var sp=document.getElementById('corrMethod')&&document.getElementById('corrMethod').value==='spearman';h+='<p><b>Correlation between two series</b> ('+(sp?'Spearman rank — monotonic, robust':'Pearson — linear')+') measures whether they move together across shared timepoints. Caution: two unrelated series that both trend will look strongly correlated — the classic "nonsense correlation." If both series trend, correlate their changes (differences) rather than their levels.</p>';refs.push(sp?'spearman':'yule');refs.push('yule');}
+  // assumptions (mode-aware)
+  if(repeated)h+='<p><b>Assumptions &amp; cautions.</b> Complete-case: a subject is used only if it has a value at every timepoint (incomplete subjects are dropped). Mixed/repeated tests assume normal residuals and sphericity (equal variance of timepoint differences); strong violations call for a Greenhouse–Geisser correction or the Python mixed model. Significance marks: ns p&gt;0.05, * p≤0.05, ** p≤0.01, *** p≤0.001.</p>';
+  else h+='<p><b>Assumptions &amp; cautions.</b> Parametric tests assume approximately normal residuals and comparable variances; with few replicates power is low, so a non-significant result is not proof of "no effect." Missing values are handled by listwise deletion (cells/timepoints with too few points are skipped or flagged). Plain time-series observations are often autocorrelated, which these tests do not model — for serial dependence use the repeated-measures toggle or the Python mixed-effects engine. Significance marks: ns p&gt;0.05, * p≤0.05, ** p≤0.01, *** p≤0.001.</p>';
+  var seen={},list=[];refs.forEach(r=>{if(REFS[r]&&!seen[r]){seen[r]=1;list.push(r);}});
+  h+='<p style="margin:8px 0 2px"><b>References (APA)</b></p><ol style="margin:0 0 0 16px;padding:0;font-size:11.5px;color:#444">'+list.map(r=>'<li style="margin-bottom:5px">'+REFS[r]+'</li>').join('')+'</ol>';
+  document.getElementById('explainBox').innerHTML=h;
+}
+
+/* ===================== MAIN ===================== */
+function update(){
+  updateExplain();
+  var err=document.getElementById('dataErr');err.textContent='';
+  var S=computeSeries();
+  renderReco(S);
+  if(S.every(s=>s.pts.length===0))err.textContent='Enter numeric values to plot.';
+  else if(document.getElementById('analysisSel').value!=='trend'&&S.some(s=>s.pts.some(p=>p.n<2))&&cfg.band!=='none'){/* fine, just no band on n=1 */}
+  var R=runAnalysis(S);
+  lastResult={S:S,R:R};
+  var svg;
+  if(cfg.chart==='area')svg=buildAreaSVG(S);
+  else if(cfg.chart==='heatmap')svg=buildHeatmapSVG(S);
+  else if(cfg.chart==='facet')svg=buildFacetSVG(S);
+  else svg=buildLineSVG(S);
+  document.getElementById('chart').innerHTML=svg;
+  renderResults(S,R);
+}
+function recalculate(){update();var h=document.getElementById('recalcHint'),t=new Date().toLocaleTimeString();h.textContent='Recalculated at '+t;h.style.color='#2f855a';setTimeout(()=>{h.style.color='';h.style.opacity='0.7';},150);}
+
+/* ===================== EXPORT ===================== */
+function currentSVGString(){return '<?xml version="1.0" encoding="UTF-8"?>\n'+new XMLSerializer().serializeToString(document.getElementById('theSVG').cloneNode(true));}
+function download(blob,name){var url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function fileBase(){return (document.getElementById('titleIn').value||'timeseries').replace(/[^\w\-]+/g,'_');}
+function exportSVG(){download(new Blob([currentSVGString()],{type:'image/svg+xml'}),fileBase()+'.svg');}
+function exportPNG(){var svgStr=currentSVGString(),svg=document.getElementById('theSVG'),w=+svg.getAttribute('width'),h=+svg.getAttribute('height'),scale=3,img=new Image(),blob=new Blob([svgStr],{type:'image/svg+xml;charset=utf-8'}),url=URL.createObjectURL(blob);img.onload=function(){var c=document.createElement('canvas');c.width=w*scale;c.height=h*scale;var ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.setTransform(scale,0,0,scale,0,0);ctx.drawImage(img,0,0);URL.revokeObjectURL(url);c.toBlob(b=>download(b,fileBase()+'.png'),'image/png');};img.onerror=function(){alert('PNG export failed; SVG still works.');URL.revokeObjectURL(url);};img.src=url;}
+function csvCell(x){x=String(x);return /[",\n]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x;}
+function buildStatsMatrix(){
+  if(!lastResult||!lastResult.R)return null;var R=lastResult.R,rows=[],rnd=(v,d)=>(v==null||isNaN(v))?'':+(+v).toFixed(d);
+  if(R.type==='trend'){rows.push(['Series','slope','intercept','R2','t','df','p','sig']);R.rows.forEach(r=>{if(r.lr)rows.push([r.name,rnd(r.lr.slope,5),rnd(r.lr.intercept,5),rnd(r.lr.r2,4),rnd(r.lr.t,3),r.lr.df,rnd(r.lr.p,5),stars(r.lr.p)]);else rows.push([r.name,'','','','','','','']);});}
+  else if(R.type==='auc'){rows.push(['Series','AUC_mean','AUC_reps_mean','AUC_reps_SD','p_vs_ref','sig']);R.rows.forEach(r=>{rows.push([r.name,rnd(r.meanAUC,4),r.perRep.length?rnd(mean(r.perRep),4):'',r.perRep.length>1?rnd(sd(r.perRep),4):'',r.cmp?rnd(r.cmp.p,5):'',r.cmp?stars(r.cmp.p):'']);});}
+  else if(R.type==='timepoint'){if(R.test==='anova'){rows.push(['Time','F','df1','df2','p_raw','p_adj','sig']);R.rows.forEach(r=>{rows.push([r.t,rnd(r.F,3),isNaN(r.praw)?'':r.dfb,isNaN(r.praw)?'':r.dfw,rnd(r.praw,5),rnd(r.padj,5),r.padj==null?'':stars(r.padj)]);});}else{rows.push(['Time','Comparison','t','p_raw','p_adj','sig']);R.rows.forEach(r=>{if(!r.pairs.length){rows.push([r.t,'(insufficient)','','','','']);}r.pairs.forEach(o=>rows.push([r.t,series[o.i]+' vs '+series[R.refS],rnd(o.w.t,3),rnd(o.w.p,5),rnd(o.padj,5),o.padj==null?'':stars(o.padj)]));});}}
+  else if(R.type==='twoway'){rows.push(['Source','df','SS','MS','F','p','sig']);if(R.aov){var a=R.aov;[['Time',a.time],['Series',a.series],['Time x Series',a.inter]].forEach(x=>{var o=x[1];if(o)rows.push([x[0],o.df,rnd(o.ss,5),rnd(o.ms,5),rnd(o.F,3),rnd(o.p,5),stars(o.p)]);else rows.push([x[0],'not estimable','','','','','']);});rows.push(['Residual',a.error.df,rnd(a.error.ss,5),rnd(a.error.ms,5),'','','']);}}
+  else if(R.type==='rmanova'){rows.push(['Source','df','SS','MS','F','p','sig']);var a=R.rm;if(!a.error){if(a.series)rows.push(['Series',a.series.df,rnd(a.series.ss,5),rnd(a.series.ms,5),rnd(a.series.F,3),rnd(a.series.p,5),stars(a.series.p)]);rows.push(['Subject(within series)',a.subj.df,rnd(a.subj.ss,5),rnd(a.subj.ms,5),'','','']);if(a.time)rows.push(['Time',a.time.df,rnd(a.time.ss,5),rnd(a.time.ms,5),rnd(a.time.F,3),rnd(a.time.p,5),stars(a.time.p)]);if(a.inter)rows.push(['Time x Series',a.inter.df,rnd(a.inter.ss,5),rnd(a.inter.ms,5),rnd(a.inter.F,3),rnd(a.inter.p,5),stars(a.inter.p)]);rows.push(['Time x Subject',a.tsubj.df,rnd(a.tsubj.ss,5),rnd(a.tsubj.ms,5),'','','']);}}
+  else if(R.type==='rmtrend'){rows.push(['Series','n_subjects','mean_slope','SD_slope','t','df','p','sig']);R.rt.rows.forEach(r=>{if(r.p!=null)rows.push([r.name,r.nSub,rnd(r.meanSlope,5),rnd(r.sdSlope,5),rnd(r.t,3),r.df,rnd(r.p,5),stars(r.p)]);else rows.push([r.name,r.nSub,'','','','','','']);});if(R.rt.groupCmp)rows.push(['Slopes between series','','','',rnd(R.rt.groupCmp.F,3),R.rt.groupCmp.dfb+';'+R.rt.groupCmp.dfw,rnd(R.rt.groupCmp.p,5),stars(R.rt.groupCmp.p)]);}
+  else if(R.type==='acf'){rows.push(['Lag','ACF']);if(R.acf)R.acf.forEach((v,L)=>rows.push([L,rnd(v,5)]));}
+  else if(R.type==='corr'){rows.push(['Pair','method','coef','n','p','sig']);if(R.res){var coef=R.method==='spearman'?R.res.rho:R.res.r;rows.push([R.a+' ~ '+R.b,R.method,rnd(coef,4),R.n,rnd(R.res.p,5),stars(R.res.p)]);}}
+  return rows;
+}
+function exportTable(){var rows=buildStatsMatrix();if(!rows){alert('No results to export yet.');return;}var csv=rows.map(r=>r.map(csvCell).join(',')).join('\r\n');download(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}),fileBase()+'_analysis.csv');}
+/* ---- minimal XLSX writer (stored ZIP) ---- */
+function crc32(b){var t=crc32.t;if(!t){t=crc32.t=[];for(var n=0;n<256;n++){var c=n;for(var k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}}var crc=0xFFFFFFFF;for(var i=0;i<b.length;i++)crc=(crc>>>8)^t[(crc^b[i])&0xFF];return (crc^0xFFFFFFFF)>>>0;}
+function zipStore(files){var enc=new TextEncoder(),parts=[],central=[],off=0;function u16(n){return [n&255,(n>>8)&255];}function u32(n){return [n&255,(n>>8)&255,(n>>16)&255,(n>>24)&255];}files.forEach(f=>{var data=typeof f.data==='string'?enc.encode(f.data):f.data,nm=enc.encode(f.name),crc=crc32(data);var lh=[].concat([80,75,3,4],u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(data.length),u32(data.length),u16(nm.length),u16(0));parts.push(new Uint8Array(lh),nm,data);central.push({h:[].concat([80,75,1,2],u16(20),u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(data.length),u32(data.length),u16(nm.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(off)),nm:nm});off+=lh.length+nm.length+data.length;});var cdOff=off,cd=[];central.forEach(c=>{cd.push(new Uint8Array(c.h),c.nm);off+=c.h.length+c.nm.length;});var end=new Uint8Array([].concat([80,75,5,6],u16(0),u16(0),u16(files.length),u16(files.length),u32(off-cdOff),u32(cdOff),u16(0)));return new Blob(parts.concat(cd,[end]),{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});}
+function xmlEsc(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+function colL(n){var s='';n++;while(n>0){var m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=(n-m-1)/26;}return s;}
+function exportXLSX(){var rows=buildStatsMatrix();if(!rows){alert('No results to export yet.');return;}var sd2='';rows.forEach((row,ri)=>{var cells='';row.forEach((cell,ci)=>{if(cell===''||cell==null)return;var ref=colL(ci)+(ri+1);if(typeof cell==='number'&&isFinite(cell))cells+='<c r="'+ref+'"><v>'+cell+'</v></c>';else cells+='<c r="'+ref+'" t="inlineStr"><is><t xml:space="preserve">'+xmlEsc(cell)+'</t></is></c>';});sd2+='<row r="'+(ri+1)+'">'+cells+'</row>';});
+  var sheet='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'+sd2+'</sheetData></worksheet>';
+  var wb='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Analysis" sheetId="1" r:id="rId1"/></sheets></workbook>';
+  var wbRels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>';
+  var rels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
+  var ct='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>';
+  download(zipStore([{name:'[Content_Types].xml',data:ct},{name:'_rels/.rels',data:rels},{name:'xl/workbook.xml',data:wb},{name:'xl/_rels/workbook.xml.rels',data:wbRels},{name:'xl/worksheets/sheet1.xml',data:sheet}]),fileBase()+'_analysis.xlsx');}
+
+/* ---- page colour themes ---- */
+var PAGE_THEMES={
+ blue:    {name:'Blue',    accent:'#2b6cb0', bg:'#5b6675', deco:['#1c4f8a','#2b6cb0','#3b82c4','#5a9bd4','#7fb3df','#a9cce8']},
+ teal:    {name:'Teal',    accent:'#0e8a7d', bg:'#4f6a68', deco:['#0a5d54','#0e8a7d','#16a99a','#4cc3b6','#84d8cf','#bfeae4']},
+ violet:  {name:'Violet',  accent:'#6b46c1', bg:'#5f5775', deco:['#4c2e96','#6b46c1','#855fd6','#a285e0','#c0aceb','#ddd2f4']},
+ crimson: {name:'Crimson', accent:'#c0392b', bg:'#6e5658', deco:['#8f231a','#c0392b','#d65f53','#e2867d','#edb1ab','#f6d8d4']},
+ green:   {name:'Green',   accent:'#2f855a', bg:'#566a5e', deco:['#1f5d3e','#2f855a','#3fa873','#6cc095','#9cd6b8','#cdeadd']},
+ amber:   {name:'Amber',   accent:'#b7791f', bg:'#6b6353', deco:['#8a5a12','#b7791f','#d4942f','#e3b15f','#eecc93','#f7e6c7']},
+ graphite:{name:'Graphite',accent:'#475569', bg:'#5c636d', deco:['#2f3a48','#475569','#64748b','#8a97a8','#b4bdca','#dde2e9']}
+};
+var PAGE_DECO=PAGE_THEMES.blue.deco;
+function renderPageThemes(){var row=document.getElementById('pageThemeRow');if(!row)return;row.innerHTML=Object.keys(PAGE_THEMES).map(k=>{var t=PAGE_THEMES[k];return '<div class="themeswatch" data-key="'+k+'" title="'+t.name+'" onclick="applyPageTheme(\''+k+'\')" style="background:linear-gradient(135deg,'+t.accent+' 58%,'+t.deco[3]+' 58%)"></div>';}).join('');}
+function hexBlend(hex,t){var h=hex.replace('#','');var r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);r=Math.round(r+(255-r)*t);g=Math.round(g+(255-g)*t);b=Math.round(b+(255-b)*t);return 'rgb('+r+','+g+','+b+')';}
+function applyPageTheme(key){var t=PAGE_THEMES[key];if(!t)return;var root=document.documentElement;root.style.setProperty('--accent',t.accent);root.style.setProperty('--accentSoft',hexBlend(t.accent,0.86));root.style.setProperty('--bg',t.bg);PAGE_DECO=t.deco;var old=document.getElementById('headerDeco');if(old)old.remove();makeHeaderDeco();var sw=document.querySelectorAll('#pageThemeRow .themeswatch');for(var i=0;i<sw.length;i++)sw[i].classList.toggle('active',sw[i].dataset.key===key);}
+function makeHeaderDeco(){var hd=document.getElementById('appHeader');if(!hd)return;var W=760,H=84,cols=15,rows=3,cw=W/cols,ch=H/rows;var blues=(typeof PAGE_DECO!=='undefined'&&PAGE_DECO)?PAGE_DECO:['#1c4f8a','#2b6cb0','#3b82c4','#5a9bd4','#7fb3df','#a9cce8'];function rc(){return blues[Math.floor(Math.random()*blues.length)];}var s='<svg id="headerDeco" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMaxYMid slice" xmlns="http://www.w3.org/2000/svg">';for(var r=0;r<rows;r++)for(var c=0;c<cols;c++){var x=c*cw,y=r*ch,op=Math.min(1,0.12+(c/cols)*1.05);if(Math.random()<0.5){s+='<polygon points="'+x+','+y+' '+(x+cw)+','+y+' '+x+','+(y+ch)+'" fill="'+rc()+'" fill-opacity="'+op.toFixed(2)+'"/>';s+='<polygon points="'+(x+cw)+','+y+' '+(x+cw)+','+(y+ch)+' '+x+','+(y+ch)+'" fill="'+rc()+'" fill-opacity="'+op.toFixed(2)+'"/>';}else{s+='<polygon points="'+x+','+y+' '+(x+cw)+','+y+' '+(x+cw)+','+(y+ch)+'" fill="'+rc()+'" fill-opacity="'+op.toFixed(2)+'"/>';s+='<polygon points="'+x+','+y+' '+(x+cw)+','+(y+ch)+' '+x+','+(y+ch)+'" fill="'+rc()+'" fill-opacity="'+op.toFixed(2)+'"/>';}}s+='</svg>';hd.insertAdjacentHTML('beforeend',s);}
+
+/* ===================== ADVANCED PYTHON ENGINE (Pyodide) ===================== */
+var pyodide=null, pyLoading=false;
+var PY_CODE = `
+import json, warnings
+import numpy as np, pandas as pd
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from scipy import stats
+
+def _stars(p):
+    return 'ns' if (not np.isfinite(p) or p>0.05) else ('*' if p>0.01 else ('**' if p>0.001 else '***'))
+def _fp(p):
+    return 'p&lt;0.001' if p<0.001 else ('p=%.3f'%p)
+
+def run_advanced(data_json, model, repeated):
+    df = pd.DataFrame(json.loads(data_json))
+    if df.empty or df['value'].notna().sum() < 3:
+        return '<p class="hint">Not enough numeric data.</p>'
+    nS = df['series'].nunique()
+
+    if model in ('mixed_ri','mixed_ris'):
+        per = df.groupby('subject').size()
+        if per.max() < 2:
+            return ('<p class="hint">Mixed-effects models need subjects measured more than once. '
+                    'Turn on <b>Repeated measures</b> in the Data card, then run again.</p>')
+        d = df.copy()
+        s = d['time'].std()
+        d['timeZ'] = (d['time'] - d['time'].mean()) / (s if s>0 else 1.0)
+        re_formula = '~timeZ' if model=='mixed_ris' else None
+        rhs = 'timeZ * C(series)' if nS>=2 else 'timeZ'
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            try:
+                m = smf.mixedlm('value ~ '+rhs, d, groups=d['subject'], re_formula=re_formula).fit(reml=True, method='lbfgs')
+            except Exception as e:
+                return '<p class="hint">Model failed to fit: %s</p>' % str(e)
+        conv = getattr(m,'converged',True)
+        rows = ''
+        for k in m.fe_params.index:
+            coef=m.fe_params[k]; se=m.bse[k]; z=m.tvalues[k]; p=m.pvalues[k]
+            nm=k.replace('C(series)[T.','').replace(']','')
+            if not np.isfinite(se) or se==0:
+                rows += '<tr><td>%s</td><td>%+.4f</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td></td></tr>'%(nm,coef)
+            else:
+                rows += '<tr><td>%s</td><td>%+.4f</td><td>%.4f</td><td>%.2f</td><td>%s</td><td class="sig">%s</td></tr>'%(nm,coef,se,z,_fp(p),_stars(p))
+        inter = [n for n in m.fe_params.index if ':' in n]
+        wald = ''
+        if inter:
+            beta = m.fe_params[inter].values
+            V = m.cov_params().loc[inter,inter].values
+            try:
+                chi2 = float(beta @ np.linalg.solve(V, beta)); dfn=len(inter); p=stats.chi2.sf(chi2,dfn)
+                wald = ('<p style="margin:8px 0 2px"><b>Time x Series interaction</b> (joint Wald): '
+                        'chi2(%d) = %.2f, %s <span class="sig">%s</span></p>' % (dfn, chi2, _fp(p), _stars(p)))
+            except Exception:
+                wald = ''
+        try:
+            re_var = float(np.atleast_2d(m.cov_re)[0,0])
+        except Exception:
+            re_var = float('nan')
+        vc = ('<div class="hint">Random intercept variance = %.4g; residual variance = %.4g. '
+              'Coefficients in standardized-time units; p-values are scale-invariant.%s</div>'
+              % (re_var, m.scale, '' if conv else ' WARN optimizer did not fully converge.'))
+        if np.isfinite(re_var) and re_var < 1e-6:
+            vc += '<div class="hint">Between-subject variance &asymp; 0: subjects show negligible clustering, so level-term SEs may be undefined (the model reduces toward OLS). The interaction test is still valid; try the <b>random intercept + slope</b> model for level estimates.</div>'
+        title = 'Linear mixed-effects model - random intercept' + (' + slope' if model=='mixed_ris' else '') + ' per subject'
+        return ('<p style="margin:0 0 6px"><b>%s</b></p>'
+                '<table><tr><th>Fixed effect</th><th>coef</th><th>SE</th><th>z</th><th>p</th><th></th></tr>%s</table>%s%s'
+                % (title, rows, wald, vc))
+    else:
+        if nS < 2:
+            return '<p class="hint">Type III two-way ANOVA needs >=2 series.</p>'
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            ols = smf.ols('value ~ C(series, Sum)*C(time, Sum)', df).fit()
+            aov = sm.stats.anova_lm(ols, typ=3)
+        label = {'C(series, Sum)':'Series','C(time, Sum)':'Time','C(series, Sum):C(time, Sum)':'Time x Series','Residual':'Residual'}
+        rows=''
+        for src in aov.index:
+            if src=='Intercept': continue
+            ss=aov.loc[src,'sum_sq']; dfn=aov.loc[src,'df']; F=aov.loc[src,'F']; p=aov.loc[src,'PR(>F)']
+            nm=label.get(src,src)
+            Fs = '' if not np.isfinite(F) else '%.2f'%F
+            ps = '' if not np.isfinite(p) else _fp(p)
+            sg = '' if not np.isfinite(p) else _stars(p)
+            rows += '<tr><td>%s</td><td>%.0f</td><td>%.4g</td><td>%s</td><td>%s</td><td class="sig">%s</td></tr>'%(nm,dfn,ss,Fs,ps,sg)
+        return ('<p style="margin:0 0 6px"><b>Two-way ANOVA - Type III (sum-to-zero contrasts)</b></p>'
+                '<table><tr><th>Source</th><th>df</th><th>SS</th><th>F</th><th>p</th><th></th></tr>%s</table>'
+                '<div class="hint">Type III SS test each term adjusted for all others - correct for unbalanced data.</div>' % rows)
+
+run_advanced(DATA_JSON, MODEL, REPEATED)
+`;
+function setPyStatus(t){document.getElementById('pyStatus').innerHTML=t;}
+function injectScript(src){return new Promise(function(res,rej){var s=document.createElement('script');s.src=src;s.onload=res;s.onerror=function(){rej(new Error('could not load '+src));};document.head.appendChild(s);});}
+async function loadPyEngine(){
+  if(pyodide||pyLoading)return;pyLoading=true;
+  var btn=document.getElementById('pyLoadBtn');btn.disabled=true;
+  setPyStatus('Loading Python runtime… (one-time download, may take 30–60 s)');
+  try{
+    if(typeof loadPyodide==='undefined')await injectScript('https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js');
+    pyodide=await loadPyodide();
+    setPyStatus('Installing packages: numpy, pandas, scipy, statsmodels…');
+    await pyodide.loadPackage(['numpy','pandas','scipy','statsmodels']);
+    var ver=await pyodide.runPythonAsync('import statsmodels; statsmodels.__version__');
+    setPyStatus('✓ Python ready (statsmodels '+ver+'). Choose a model and run.');
+    document.getElementById('pyControls').style.display='block';
+    updatePyModelHint();
+    btn.textContent='✓ Engine loaded';btn.disabled=true;
+  }catch(e){
+    setPyStatus('<span style="color:#c05621">⚠ Could not load the Python engine ('+e+'). This feature needs internet; the JS engine above still works offline.</span>');
+    btn.disabled=false;
+  }
+  pyLoading=false;
+}
+function buildLongRows(){
+  ensure();var rows=[];
+  for(var ti=0;ti<tpoints.length;ti++){var t=Number(tpoints[ti]);if(!isFinite(t))continue;
+    for(var si=0;si<series.length;si++)for(var r=0;r<nRep;r++){var raw=data[ti][si][r];var v=Number(raw);if(raw===''||raw==null||String(raw).trim()===''||!isFinite(v))continue;
+      rows.push({time:t,series:series[si],subject:repeated?(series[si]+'_S'+(r+1)):(series[si]+'_t'+ti+'_r'+r),value:v});}}
+  return rows;
+}
+function pyOutMsg(h){document.getElementById('pyResultPanel').style.display='block';document.getElementById('pyOut').innerHTML='<p class="hint">'+h+'</p>';}
+var PY_MODEL_HINTS={
+ mixed_ri:'value ~ time × series with a random intercept per subject — the proper mixed model for repeated measures; the Time×Series interaction (joint Wald) tests divergence. Needs Repeated-measures mode.',
+ mixed_ris:'Adds a random slope per subject, so each subject has its own rate of change. More flexible; may warn on non-linear data or few subjects. Needs Repeated-measures mode.',
+ anova3:'Type III two-way ANOVA (Series × Time, categorical). Unbalanced-safe omnibus; works with or without repeated-measures mode.'
+};
+function updatePyModelHint(){var el=document.getElementById('pyModelHint');if(el)el.textContent=PY_MODEL_HINTS[document.getElementById('pyModel').value]||'';}
+async function runPy(){
+  if(!pyodide){pyOutMsg('Load the Python engine first.');return;}
+  var rows=buildLongRows();if(rows.length<3){pyOutMsg('Not enough numeric data to model.');return;}
+  var model=document.getElementById('pyModel').value,btn=document.getElementById('pyRunBtn');
+  btn.disabled=true;pyOutMsg('Running '+model+' in Python…');
+  try{
+    pyodide.globals.set('DATA_JSON',JSON.stringify(rows));
+    pyodide.globals.set('MODEL',model);
+    pyodide.globals.set('REPEATED',!!repeated);
+    var html=await pyodide.runPythonAsync(PY_CODE);
+    document.getElementById('pyResultPanel').style.display='block';
+    document.getElementById('pyOut').innerHTML=html;
+  }catch(e){pyOutMsg('<span style="color:#c05621">⚠ Python error: '+e+'</span>');}
+  btn.disabled=false;
+}
+
+/* ===================== WIRING ===================== */
+var RM_DESC='<b>Repeated-measures mode is ON.</b> Each column is now <b>one subject followed across every timepoint</b> — column <b>S1</b> in a series must be the <i>same individual</i> (animal, patient, dish, cell line) at all rows. Enter that subject\'s value going <b>down</b> its column, one per timepoint.<br>'+
+  '• <b>Line up</b> each subject in its own column across all rows (S1 at 0 min and S1 at 30 min = same subject).<br>'+
+  '• A subject must have a value at <b>every</b> timepoint to be used; incomplete subjects are dropped from the model.<br>'+
+  '• Subjects in <b>different series are different individuals</b> (Control S1 ≠ Treated_1 S1).<br>'+
+  'The mixed model then fits each subject\'s own baseline (random intercept), so within-subject correlation is handled correctly. Use this when you <b>track the same subjects over time</b>; turn it off if each timepoint uses fresh, independent samples.';
+function relabelAnalysisOptions(){var sel=document.getElementById('analysisSel');[...sel.options].forEach(o=>{if(o.value==='trend'||o.value==='twoway')o.text=anLabel(o.value);});}
+function applyRMUI(){
+  document.getElementById('rmLabel').textContent=repeated?'Repeated measures (same subjects)':'Independent samples';
+  document.getElementById('repLabel').textContent=repeated?'Subject':'Replicate';
+  var ban=document.getElementById('rmBanner');ban.style.display=repeated?'block':'none';if(repeated)ban.innerHTML=RM_DESC;
+  relabelAnalysisOptions();
+  renderGrid();
+}
+document.getElementById('rmChk').addEventListener('change',e=>{repeated=e.target.checked;applyRMUI();showAnBlocks();update();applyReco();});
+function loadExample(which){if(which==='dense')exampleDense();else exampleFew();renderGrid();update();}
+function toggleExpand(){expanded=!expanded;var p=document.getElementById('dataPanel');document.getElementById('expandBtn').textContent=expanded?'⤡':'⤢';var bd=document.getElementById('inputBackdrop');if(expanded){p.classList.add('modal');if(!bd){bd=document.createElement('div');bd.id='inputBackdrop';bd.className='backdrop';bd.onclick=toggleExpand;document.body.appendChild(bd);}}else{p.classList.remove('modal');if(bd)bd.remove();}}
+function segWire(id,key,map){document.getElementById(id).addEventListener('click',e=>{var b=e.target.closest('button');if(!b)return;[...e.currentTarget.children].forEach(x=>x.classList.remove('on'));b.classList.add('on');cfg[key]=b.dataset[map];update();});}
+segWire('chartSeg','chart','t');segWire('colorSeg','color','c');segWire('bandSeg','band','b');
+document.getElementById('colorSeg').addEventListener('click',()=>{document.getElementById('themeWrap').style.display=cfg.color==='color'?'block':'none';});
+function renderSwatch(){var t=document.getElementById('themeSel').value;document.getElementById('themeSwatch').innerHTML=THEMES[t].slice(0,6).map(c=>'<span style="width:20px;height:14px;border-radius:3px;border:1px solid rgba(0,0,0,.2);background:'+c+'"></span>').join('');}
+document.getElementById('themeSel').addEventListener('change',e=>{PALETTE=THEMES[e.target.value]||THEMES.classic;renderSwatch();update();});
+renderSwatch();
+function showAnBlocks(){var t=document.getElementById('analysisSel').value;['anTimepoint','anAcf','anCorr','anAuc'].forEach(id=>document.getElementById(id).style.display='none');if(t==='timepoint')document.getElementById('anTimepoint').style.display='block';if(t==='acf')document.getElementById('anAcf').style.display='block';if(t==='corr')document.getElementById('anCorr').style.display='block';if(t==='auc')document.getElementById('anAuc').style.display='block';
+  var hints=repeated?{
+    trend:'Fits one slope per subject, then tests each group\'s mean slope vs zero and compares slopes between groups.',
+    timepoint:'Compares series at each timepoint (between-subjects at that time), correcting across times.',
+    auc:'Integrates each subject\'s trajectory and compares total area between groups.',
+    twoway:'Repeated-measures (mixed) ANOVA: Time within-subject × Series between-subject, with per-subject baselines.',
+    acf:'Diagnoses self-similarity over lags on the group mean — reveals trend or periodicity.',
+    corr:'Associates two series\' means across shared timepoints (Pearson or Spearman).'
+  }:{
+    trend:'Fits a straight line to each series and tests if its slope differs from zero.',timepoint:'Compares series against each other at every timepoint, correcting across times.',auc:'Integrates each trajectory (trapezoidal) and compares total area between series.',twoway:'Omnibus test: effects of time, series, and whether they interact (diverge).',acf:'Diagnoses self-similarity over lags — reveals trend or periodicity.',corr:'Associates two series across shared timepoints (Pearson or Spearman).'};
+  document.getElementById('anHint').textContent=hints[t]||'';}
+document.getElementById('analysisSel').addEventListener('change',()=>{showAnBlocks();updateTpRefVis();update();});
+function updateTpRefVis(){document.getElementById('tpRefWrap').style.display=document.getElementById('tpTestSel').value==='ttest'?'block':'none';}
+document.getElementById('tpTestSel').addEventListener('change',()=>{updateTpRefVis();update();});
+['tpAdjSel','tpRefSel','acfSeriesSel','corrA','corrB','corrMethod','aucRefSel'].forEach(id=>document.getElementById(id).addEventListener('change',update));
+document.getElementById('acfLagIn').addEventListener('input',e=>{document.getElementById('acfLagVal').textContent=e.target.value;update();});
+['titleIn','xlabIn','ylabIn'].forEach(id=>document.getElementById(id).addEventListener('input',update));
+['dotsChk','spaghettiChk','markersChk','smoothChk','trendChk','legendChk'].forEach(id=>document.getElementById(id).addEventListener('change',update));
+document.getElementById('smWinIn').addEventListener('input',e=>{document.getElementById('smWinVal').textContent=e.target.value;update();});
+document.getElementById('lwIn').addEventListener('input',e=>{cfg.lw=+e.target.value;document.getElementById('lwVal').textContent=cfg.lw.toFixed(1)+'×';update();});
+document.getElementById('fsIn').addEventListener('input',e=>{cfg.fs=+e.target.value;document.getElementById('fsVal').textContent=cfg.fs.toFixed(1)+'×';update();});
+document.getElementById('wIn').addEventListener('input',e=>{cfg.W=Math.max(300,+e.target.value||680);update();});
+document.getElementById('arIn').addEventListener('change',e=>{cfg.ar=+e.target.value;update();});
+// init
+renderPageThemes();applyPageTheme('graphite');
+showAnBlocks();updateTpRefVis();
+exampleFew();renderGrid();update();
+applyReco(); // start on the analysis best suited to the example data
+</script>
+</body>
+</html>
