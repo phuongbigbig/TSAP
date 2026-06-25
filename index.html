@@ -110,6 +110,7 @@
        display:inline-flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.15)}
   .cardExpandBtn:hover{background:var(--accentSoft)}
   .panel.modal .cardExpandBtn{position:fixed;top:30px;right:30px;width:36px;height:36px;font-size:18px}
+  .panel.modal #gridWrap{max-height:calc(100vh - 250px)!important}
   .panel.modal .chartwrap{height:calc(100vh - 96px);display:flex;align-items:center;justify-content:center;overflow:auto}
   .panel.modal #chart svg{width:100%!important;height:100%!important;max-width:none!important}
   #pageThemePanel{margin:4px 0 28px}
@@ -137,7 +138,7 @@
       </div>
       <div class="rmbanner" id="rmBanner" style="display:none"></div>
 
-      <div id="gridWrap" style="overflow-x:auto;margin-top:6px">
+      <div id="gridWrap" style="overflow:auto;max-height:300px;margin-top:6px">
         <div id="gridTS"></div>
       </div>
 
@@ -146,7 +147,22 @@
         <span class="stepper"><span>Time</span><button onclick="addTime()" title="Add timepoint">+</button><button class="minus" onclick="removeTime()" title="Remove timepoint">−</button></span>
         <span class="stepper"><span id="repLabel">Replicate</span><button onclick="addRep()" title="Add replicate">+</button><button class="minus" onclick="removeRep()" title="Remove replicate">−</button></span>
       </div>
-      <div class="btns"><button onclick="loadExample('few')">Example · replicated</button><button onclick="loadExample('dense')">Example · dense signal</button></div>
+      <div class="btns">
+        <button onclick="loadExample('few')">Example · replicated</button>
+        <button onclick="loadExample('dense')">Example · dense signal</button>
+        <button class="primary" onclick="document.getElementById('fileIn').click()">⬆ Upload CSV / TSV</button>
+        <button onclick="downloadTemplate()">Download template</button>
+        <input type="file" id="fileIn" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" style="display:none" onchange="handleFileUpload(event)">
+      </div>
+      <div class="hint" id="uploadStatus" style="margin-top:6px"></div>
+      <details style="margin-top:4px"><summary>Accepted file format</summary>
+        <div class="hint" style="line-height:1.55">
+          The delimiter (comma or tab) is detected automatically. Two layouts are recognized:<br><br>
+          <b>1 · Wide</b> (same shape as the table above) — first column <b>Time</b>; then one column per measurement. Group replicates of the same series by giving columns a shared name with an <code>_R1, _R2…</code> suffix (e.g. <code>Time, Control_R1, Control_R2, Treated_R1, Treated_R2</code>). Use <code>_S1, _S2…</code> instead to mark the <b>same subjects</b> tracked over time — this auto-enables repeated-measures mode.<br><br>
+          <b>2 · Long / tidy</b> — columns named <b>time</b>, <b>series</b> (or group/condition), <b>value</b>, and optionally <b>subject</b>. One row per measurement; a <code>subject</code> column auto-enables repeated-measures.<br><br>
+          Click <b>Download template</b> to get a ready-made CSV of the current table to fill in.
+        </div>
+      </details>
       <div class="err" id="dataErr"></div>
       <button id="expandBtn" onclick="toggleExpand()" title="Expand / collapse the input table">⤢</button>
     </div>
@@ -1180,6 +1196,79 @@ async function runPy(){
   }catch(e){pyOutMsg('<span style="color:#c05621">⚠ Python error: '+e+'</span>');}
   btn.disabled=false;
 }
+
+/* ===================== CSV / TSV IMPORT ===================== */
+function uploadMsg(t,isErr){var el=document.getElementById('uploadStatus');if(!el)return;el.innerHTML=t;el.style.color=isErr?'#c05621':'#2f855a';}
+function parseDelimited(text,delim){
+  text=text.replace(/\r\n?/g,'\n');var rows=[],row=[],cur='',inq=false;
+  for(var i=0;i<text.length;i++){var ch=text[i];
+    if(inq){if(ch==='"'){if(text[i+1]==='"'){cur+='"';i++;}else inq=false;}else cur+=ch;}
+    else{if(ch==='"')inq=true;else if(ch===delim){row.push(cur);cur='';}else if(ch==='\n'){row.push(cur);rows.push(row);row=[];cur='';}else cur+=ch;}
+  }
+  if(cur!==''||row.length){row.push(cur);rows.push(row);}
+  return rows.filter(r=>!(r.length===1&&r[0].trim()===''));
+}
+function detectDelim(name,text){if(/\.tsv$/i.test(name))return '\t';if(/\.csv$/i.test(name))return ',';var first=(text.split(/\r?\n/)[0]||'');return ((first.match(/\t/g)||[]).length>(first.match(/,/g)||[]).length)?'\t':',';}
+function handleFileUpload(e){var f=e.target.files&&e.target.files[0];if(!f)return;var fr=new FileReader();
+  fr.onload=function(){try{var text=String(fr.result);var rows=parseDelimited(text,detectDelim(f.name,text));importData(rows,f.name);}catch(err){uploadMsg('Could not parse file: '+err,true);}e.target.value='';};
+  fr.onerror=function(){uploadMsg('Could not read file.',true);};fr.readAsText(f);}
+function importData(rows,fname){
+  if(!rows.length){uploadMsg('No rows found in the file.',true);return;}
+  var header=rows[0].map(c=>(c||'').trim()),norm=header.map(h=>h.toLowerCase());
+  function find(pred){for(var i=0;i<norm.length;i++)if(pred(norm[i]))return i;return -1;}
+  var timeCol=find(h=>h==='time'||h==='t'||h==='x'||h==='timepoint'||h.indexOf('time')===0);
+  var valCol=find(h=>h==='value'||h==='val'||h==='y'||h==='measurement'||h==='expression'||h==='signal'||h==='reading'||h.indexOf('value')===0);
+  if(timeCol>=0&&valCol>=0&&timeCol!==valCol)importLong(rows,norm,timeCol,valCol,fname);
+  else importWide(rows,header,fname);
+}
+function importLong(rows,norm,timeCol,valCol,fname){
+  var serCol=norm.findIndex(h=>h==='series'||h==='group'||h==='condition'||h==='sample'||h==='treatment'||h==='arm'||h.indexOf('series')>=0||h.indexOf('group')>=0||h.indexOf('condition')>=0);
+  var subCol=norm.findIndex(h=>h==='subject'||h==='id'||h==='replicate'||h==='rep'||h==='animal'||h==='patient'||h.indexOf('subject')>=0||h.indexOf('replicate')>=0);
+  var body=rows.slice(1);
+  var recs=body.map(r=>({t:(r[timeCol]||'').trim(),s:serCol>=0?((r[serCol]||'').trim()||'Series 1'):'Series 1',v:(r[valCol]||'').trim(),sub:subCol>=0?(r[subCol]||'').trim():''}))
+               .filter(x=>x.t!==''&&x.v!==''&&isFinite(Number(x.t))&&isFinite(Number(x.v)));
+  if(!recs.length){uploadMsg('No numeric time/value rows found (check the column names).',true);return;}
+  var times=[],names=[];recs.forEach(x=>{if(times.indexOf(x.t)<0)times.push(x.t);if(names.indexOf(x.s)<0)names.push(x.s);});
+  times.sort((a,b)=>Number(a)-Number(b));
+  var hasSub=subCol>=0&&recs.some(x=>x.sub!=='');
+  var subsBy={};if(hasSub){names.forEach(s=>subsBy[s]=[]);recs.forEach(x=>{if(x.sub!==''&&subsBy[x.s].indexOf(x.sub)<0)subsBy[x.s].push(x.sub);});}
+  var nrep;
+  if(hasSub)nrep=Math.max(1,...names.map(s=>subsBy[s].length));
+  else{var cnt={};recs.forEach(x=>{var k=x.t+''+x.s;cnt[k]=(cnt[k]||0)+1;});nrep=Math.max.apply(null,[1].concat(Object.keys(cnt).map(k=>cnt[k])));}
+  var tIdx={};times.forEach((t,i)=>tIdx[t]=i);var sIdx={};names.forEach((s,i)=>sIdx[s]=i);
+  var nd=[];for(var ti=0;ti<times.length;ti++){nd[ti]=[];for(var si=0;si<names.length;si++){nd[ti][si]=[];for(var r=0;r<nrep;r++)nd[ti][si].push('');}}
+  if(hasSub)recs.forEach(x=>{var r=subsBy[x.s].indexOf(x.sub);if(r>=0&&r<nrep)nd[tIdx[x.t]][sIdx[x.s]][r]=x.v;});
+  else{var fi={};recs.forEach(x=>{var k=x.t+''+x.s,r=fi[k]||0;if(r<nrep)nd[tIdx[x.t]][sIdx[x.s]][r]=x.v;fi[k]=r+1;});}
+  applyImported(times,names,nrep,nd,hasSub,fname);
+}
+function importWide(rows,header,fname){
+  if(rows.length<2){uploadMsg('Need a header row and at least one data row.',true);return;}
+  function parseRep(name){var m=name.match(/^(.*?)[\s_.\-]+(replicate|subject|rep|sub|r|s)[\s_.\-]?(\d+)$/i);return m?{base:m[1].trim(),letter:m[2][0].toLowerCase()}:null;}
+  var groups=[],byBase={};
+  for(var c=1;c<header.length;c++){var h=(header[c]||'').trim();if(h==='')continue;var pr=parseRep(h),base=pr?pr.base:h;if(base==='')base='Series '+c;var g=byBase[base];if(!g){g={name:base,cols:[],subject:false};byBase[base]=g;groups.push(g);}g.cols.push(c);if(pr&&pr.letter==='s')g.subject=true;}
+  if(!groups.length){uploadMsg('No data columns found after the first (Time) column.',true);return;}
+  var nrep=Math.max.apply(null,[1].concat(groups.map(g=>g.cols.length)));
+  var hasSub=groups.some(g=>g.subject);
+  var body=rows.slice(1).filter(r=>((r[0]||'').trim()!=='')&&isFinite(Number((r[0]||'').trim())));
+  if(!body.length){uploadMsg('No numeric Time values found in the first column.',true);return;}
+  var times=body.map(r=>(r[0]||'').trim());
+  var nd=body.map(r=>groups.map(g=>{var cell=[];for(var k=0;k<nrep;k++){var col=g.cols[k];cell.push(col!==undefined?((r[col]||'').trim()):'');}return cell;}));
+  applyImported(times,groups.map(g=>g.name),nrep,nd,hasSub,fname);
+}
+function applyImported(times,names,nrep,nd,rep,fname){
+  tpoints=times.slice();series=names.slice();nRep=Math.max(1,nrep|0);data=nd;
+  repeated=!!rep;var chk=document.getElementById('rmChk');if(chk)chk.checked=repeated;
+  ensure();applyRMUI();update();applyReco();
+  uploadMsg('✓ Loaded <b>'+series.length+'</b> series × <b>'+tpoints.length+'</b> timepoints × <b>'+nRep+'</b> '+(repeated?'subjects':'replicates')+' from '+escHtml(fname||'file')+(repeated?' — repeated-measures detected.':'.'));
+}
+function buildDataCSV(){
+  ensure();var unit=repeated?'S':'R',head=['Time'];
+  series.forEach(s=>{for(var r=0;r<nRep;r++)head.push(String(s).replace(/[ ,]+/g,'_')+'_'+unit+(r+1));});
+  var lines=[head.map(csvCell).join(',')];
+  tpoints.forEach((t,ti)=>{var row=[t];series.forEach((s,si)=>{for(var r=0;r<nRep;r++)row.push(data[ti][si][r]==null?'':data[ti][si][r]);});lines.push(row.map(csvCell).join(','));});
+  return lines.join('\r\n');
+}
+function downloadTemplate(){download(new Blob(['﻿'+buildDataCSV()],{type:'text/csv;charset=utf-8'}),'TSAP_data_template.csv');}
 
 /* ===================== WIRING ===================== */
 var RM_DESC='<b>Repeated-measures mode is ON.</b> Each column is now <b>one subject followed across every timepoint</b> — column <b>S1</b> in a series must be the <i>same individual</i> (animal, patient, dish, cell line) at all rows. Enter that subject\'s value going <b>down</b> its column, one per timepoint.<br>'+
