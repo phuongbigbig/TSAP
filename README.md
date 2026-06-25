@@ -42,21 +42,6 @@ Click **Load Python engine** to run real [`statsmodels`](https://www.statsmodels
 - Plot as **SVG** or **PNG**
 - Statistics as **CSV** or **XLSX** (written natively, no libraries)
 
----
-
-## Deploying to GitHub Pages
-
-1. Create a GitHub repository and add `timeseries.html` (and this `README.md`).
-2. **Rename `timeseries.html` to `index.html`** so it loads as the site homepage (or keep the name and link to it directly).
-3. In the repo, go to **Settings → Pages**, set **Source** to your `main` branch (root folder), and save.
-4. Your app will be live at `https://<your-username>.github.io/<repo-name>/` within a minute or two.
-
-### Does the Python engine work on GitHub Pages?
-**Yes.** Pyodide is loaded from the jsDelivr CDN and runs entirely on the browser's main thread, so it needs **no special server headers** (no cross-origin isolation / `SharedArrayBuffer`), which GitHub Pages can't provide anyway. Notes:
-
-- The first time a visitor clicks **Load Python engine**, the browser downloads the Python runtime and packages (tens of MB) from the CDN — this needs an internet connection and takes ~30–60 s. It's cached afterward.
-- Everything else (all JavaScript analyses, plots, and exports) works **offline** once the page has loaded.
-- Networks that block `cdn.jsdelivr.net` will prevent only the optional Python features; the built-in engine still works.
 
 ---
 
