@@ -324,6 +324,7 @@
       <label><input type="checkbox" id="smoothChk" style="width:auto;margin-right:6px">Moving-average smoothing</label>
       <label><input type="checkbox" id="trendChk" style="width:auto;margin-right:6px">Overlay linear trend lines</label>
       <label><input type="checkbox" id="legendChk" checked style="width:auto;margin-right:6px">Show legend</label>
+      <label><input type="checkbox" id="yZeroChk" checked style="width:auto;margin-right:6px">Y axis includes zero</label>
 
       <div class="slabel"><span>Smoothing window</span><b id="smWinVal">3</b></div>
       <input type="range" id="smWinIn" min="2" max="9" step="1" value="3">
@@ -399,30 +400,23 @@ function lsRSS(cols,y){var n=y.length,Q=[],r=y.slice(),tol=1e-9;
 // Type III sums of squares (sum-to-zero coding): each term adjusted for all others, so it is valid for unequal n.
 // Equals the classical balanced-design ANOVA when every cell has the same n. Empty cells make Type III only rank-defined.
 function twoWayANOVA(cells,T,S){
-  var y=[],ti_=[],si_=[],N=0,nonEmpty=0,counts=[];
-  for(var ti=0;ti<T;ti++)for(var si=0;si<S;si++){var c=cells[ti][si]||[];if(c.length){nonEmpty++;counts.push(c.length);c.forEach(v=>{y.push(v);ti_.push(ti);si_.push(si);});}}
-  N=y.length;if(N<3||nonEmpty<2)return null;
-  if(N-nonEmpty<1)return null;
+  // Type III tests depend only on cell means and cell sizes: RSS(model) = within-cell SS + weighted RSS on the cell means.
+  var cm=[],cw=[],ti_=[],si_=[],raw=[],counts=[],ssE=0,nonEmpty=0;
+  for(var ti=0;ti<T;ti++)for(var si=0;si<S;si++){var c=cells[ti][si]||[];if(!c.length)continue;nonEmpty++;counts.push(c.length);var m=mean(c);c.forEach(v=>{ssE+=(v-m)*(v-m);raw.push(v);});cm.push(m);cw.push(Math.sqrt(c.length));ti_.push(ti);si_.push(si);}
+  var N=raw.length;if(N<3||nonEmpty<2||N-nonEmpty<1)return null;
   var tLev=[],sLev=[];for(ti=0;ti<T;ti++)if(ti_.indexOf(ti)>=0)tLev.push(ti);for(si=0;si<S;si++)if(si_.indexOf(si)>=0)sLev.push(si);
-  var Tp=tLev.length,Sp=sLev.length;
-  var dfTime=Tp-1,dfSeries=Sp-1;if(dfTime<1||dfSeries<1)return null;
-  if(nonEmpty===Tp*Sp&&counts.every(x=>x===counts[0])){ // balanced: closed-form sums of squares, O(N)
-    var n0=counts[0],grand=mean(y),rT=new Array(T).fill(0),cS=new Array(S).fill(0),ssC=0,ssE=0;
-    for(var a=0;a<T;a++)for(var b=0;b<S;b++){var c=cells[a][b]||[];if(!c.length)continue;var m=mean(c);rT[a]+=m;cS[b]+=m;ssC+=n0*(m-grand)*(m-grand);c.forEach(v=>ssE+=(v-m)*(v-m));}
-    var ssT=0,ssS=0;rT.forEach((v,a)=>{if(ti_.indexOf(a)>=0){var m=v/Sp;ssT+=n0*Sp*(m-grand)*(m-grand);}});cS.forEach((v,b)=>{if(si_.indexOf(b)>=0){var m=v/Tp;ssS+=n0*Tp*(m-grand)*(m-grand);}});
-    var dfE=N-Tp*Sp;if(dfE<1)return null;var msE=ssE/dfE;
-    var rowB=function(ss,df){if(df<1||!(msE>1e-300))return null;ss=Math.max(0,ss);var ms=ss/df,F=ms/msE;return{ss:ss,df:df,ms:ms,F:F,p:fDistP(F,df,dfE)};};
-    return{time:rowB(ssT,dfTime),series:rowB(ssS,dfSeries),inter:rowB(ssC-ssT-ssS,dfTime*dfSeries),error:{ss:ssE,df:dfE,ms:msE},N:N,emptyCells:false,unbalanced:false,nonEmpty:nonEmpty,Tp:Tp,Sp:Sp};
-  }
-  function code(levels,arr){var last=levels[levels.length-1];return levels.slice(0,-1).map(l=>arr.map(a=>a===l?1:(a===last?-1:0)));}
+  var Tp=tLev.length,Sp=sLev.length,dfTime=Tp-1,dfSeries=Sp-1;if(dfTime<1||dfSeries<1)return null;
+  var balanced=nonEmpty===Tp*Sp&&counts.every(x=>x===counts[0]);
+  var y=cm.map((m,i)=>m*cw[i]);
+  function code(levels,arr){var last=levels[levels.length-1];return levels.slice(0,-1).map(l=>arr.map((a,i)=>(a===l?1:(a===last?-1:0))*cw[i]));}
   var tc=code(tLev,ti_),sc=code(sLev,si_),ic=[];
-  tc.forEach(a=>sc.forEach(b=>ic.push(a.map((v,i)=>v*b[i]))));
-  var one=y.map(()=>1),all=[one].concat(tc,sc,ic),full=lsRSS(all,y);
+  tc.forEach(a=>sc.forEach(b=>ic.push(a.map((v,i)=>v*(b[i]/cw[i])))));
+  var one=cw.slice(),full=lsRSS([one].concat(tc,sc,ic),y);
   var dfError=N-full.rank;if(dfError<1)return null;
-  var msErr=full.rss/dfError,counts_eq=counts.every(x=>x===counts[0])&&nonEmpty===Tp*Sp;
+  var ssErrTot=ssE+full.rss,msErr=ssErrTot/dfError;
   function term(cols){var red=lsRSS([one].concat(cols),y),df=full.rank-red.rank,ss=Math.max(0,red.rss-full.rss);
     if(df<1||!(msErr>1e-300))return null;var ms=ss/df,F=ms/msErr;return{ss:ss,df:df,ms:ms,F:F,p:fDistP(F,df,dfError)};}
-  return{time:term(sc.concat(ic)),series:term(tc.concat(ic)),inter:term(tc.concat(sc)),error:{ss:full.rss,df:dfError,ms:msErr},N:N,emptyCells:nonEmpty<Tp*Sp,unbalanced:!counts_eq,nonEmpty:nonEmpty,Tp:Tp,Sp:Sp};
+  return{time:term(sc.concat(ic)),series:term(tc.concat(ic)),inter:term(tc.concat(sc)),error:{ss:ssErrTot,df:dfError,ms:msErr},N:N,emptyCells:nonEmpty<Tp*Sp,unbalanced:!balanced,nonEmpty:nonEmpty,Tp:Tp,Sp:Sp};
 }
 
 /* ===================== DATA MODEL ===================== */
@@ -465,6 +459,8 @@ function exampleDense(){
 
 // compute per-series clean structure
 var parseWarn={badTimes:0,badVals:0,dupTimes:0};
+// value of replicate column r at a point (mean of duplicates pooled into the point), or undefined
+function repVal(p,r){var c=p.cols&&p.cols[r];return c?mean(c):undefined;}
 function computeSeries(){
   ensure();
   var out=[],bv=0,dup=0,badT=0;
@@ -473,12 +469,12 @@ function computeSeries(){
     var pts=[],byT={};
     for(var ti=0;ti<tpoints.length;ti++){
       var t=parseNum(tpoints[ti]);if(!isFinite(t))continue;
-      var reps=[],idx=[];
-      data[ti][si].forEach((v,r)=>{if(v===null||v===undefined||String(v).trim()==='')return;var x=parseNum(v);if(isFinite(x)){reps.push(x);idx.push(r);}else bv++;});
+      var reps=[],idx=[],cols={};
+      data[ti][si].forEach((v,r)=>{if(v===null||v===undefined||String(v).trim()==='')return;var x=parseNum(v);if(isFinite(x)){reps.push(x);idx.push(r);cols[r]=[x];}else bv++;});
       if(!reps.length)continue;
       var k=String(t);
-      if(byT[k]){var q=byT[k];q.dupCount=(q.dupCount||1)+1;idx.forEach(r=>q.idx.push(r+nRep*(q.dupCount-1)));q.reps=q.reps.concat(reps);q.n=q.reps.length;q.mean=mean(q.reps);dup++;}
-      else{var pt={t:t,reps:reps,idx:idx,mean:mean(reps),n:reps.length};byT[k]=pt;pts.push(pt);}
+      if(byT[k]){var q=byT[k];idx.forEach(r=>{if(q.cols[r])q.cols[r].push(cols[r][0]);else{q.cols[r]=cols[r];q.idx.push(r);}});q.reps=q.reps.concat(reps);q.n=q.reps.length;q.mean=mean(q.reps);dup++;}
+      else{var pt={t:t,reps:reps,idx:idx,cols:cols,mean:mean(reps),n:reps.length};byT[k]=pt;pts.push(pt);}
     }
     pts.sort((a,b)=>a.t-b.t);
     out.push({name:series[si],pts:pts});
@@ -632,12 +628,14 @@ function hexToRgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(c=>c+
 /* ===================== AXIS HELPERS ===================== */
 function niceNum(x,round){var exp=Math.floor(Math.log10(Math.abs(x)||1)),f=x/Math.pow(10,exp),nf;if(round){nf=f<1.5?1:f<3?2:f<7?5:10;}else{nf=f<=1?1:f<=2?2:f<=5?5:10;}return nf*Math.pow(10,exp);}
 function axisTicks(lo,hi,n){if(lo===hi){lo-=0.5;hi+=0.5;}var range=niceNum(hi-lo,false),step=niceNum(range/Math.max(1,n-1),true),gLo=Math.floor(lo/step)*step,gHi=Math.ceil(hi/step)*step,out=[];for(var v=gLo;v<=gHi+step/2;v+=step)out.push(+v.toPrecision(10));return{ticks:out,lo:gLo,hi:gHi,step:step};}
-function fmtTick(t){if(Math.abs(t)<1e-9)return '0';var a=Math.abs(t);if(a>=1000||a<0.01)return t.toPrecision(3);return (t%1===0?t.toString():(+t.toFixed(2)).toString());}
+function fmtTick(t){if(Math.abs(t)<1e-9)return '0';var a=Math.abs(t);if(a>=1e6||a<0.01)return t.toPrecision(3);return (t%1===0?t.toString():(+t.toFixed(2)).toString());}
 function seriesBandHalf(p){if(cfg.band==='none'||p.n<2)return 0;var s=sd(p.reps);if(cfg.band==='sd')return s;var sem=s/Math.sqrt(p.n);if(cfg.band==='sem')return sem;return invT(0.05,p.n-1)*sem;} // 95% CI = t(0.975,n-1)*SEM
 
-function movingAvg(ys,w){var out=[],h=Math.floor(w/2);for(var i=0;i<ys.length;i++){var a=Math.max(0,i-h),b=Math.min(ys.length-1,i+h),s=0,c=0;for(var k=a;k<=b;k++){s+=ys[k];c++;}out.push(s/c);}return out;}
+function movingAvg(ys,w){var out=[],h=Math.floor((w>=1?w:1)/2); // window = 2h+1 points (even w is rounded up to odd), shrinking at the edges
+  for(var i=0;i<ys.length;i++){var a=Math.max(0,i-h),b=Math.min(ys.length-1,i+h),s=0,c=0;for(var k=a;k<=b;k++){s+=ys[k];c++;}out.push(s/c);}return out;}
 
 /* ===================== PLOT: shared frame ===================== */
+function yZero(){var e=document.getElementById('yZeroChk');return !e||e.checked;}
 function dataExtent(S){var xs=[],ys=[];S.forEach(s=>s.pts.forEach(p=>{xs.push(p.t);var h=seriesBandHalf(p);ys.push(p.mean+h);ys.push(p.mean-h);if(document.getElementById('dotsChk').checked||document.getElementById('spaghettiChk').checked)p.reps.forEach(r=>ys.push(r));}));return{xs:xs,ys:ys};}
 
 function buildLineSVG(S){
@@ -649,7 +647,7 @@ function buildLineSVG(S){
   if(!ext.xs.length)return emptySVG(W,H,mT,mL,plotW,plotH);
   var xMin=Math.min.apply(null,ext.xs),xMax=Math.max.apply(null,ext.xs);
   var yMin=Math.min.apply(null,ext.ys),yMax=Math.max.apply(null,ext.ys);
-  var xa=axisTicks(xMin,xMax,6),ya=axisTicks(Math.min(0,yMin),yMax,6);
+  var xa=axisTicks(xMin,xMax,6),ya=axisTicks(yZero()?Math.min(0,yMin):yMin,yZero()?Math.max(0,yMax):yMax,6);
   function X(t){return mL+(t-xa.lo)/(xa.hi-xa.lo)*plotW;}
   function Y(v){return mT+plotH-(v-ya.lo)/(ya.hi-ya.lo)*plotH;}
   var s=frameStart(W,H);
@@ -661,13 +659,13 @@ function buildLineSVG(S){
   S.forEach((ser,si)=>{
     if(ser.pts.length<1)return;
     var col=seriesColor(si,n),dash=seriesDash(si);
-    // band
-    if(showBand){var hasBand=ser.pts.some(p=>p.n>=2);if(hasBand){var up='',dn='';ser.pts.forEach((p,i)=>{var h=seriesBandHalf(p);up+=(i?' L':'M')+X(p.t).toFixed(1)+','+Y(p.mean+h).toFixed(1);});for(var i=ser.pts.length-1;i>=0;i--){var p=ser.pts[i],h=seriesBandHalf(p);dn+=' L'+X(p.t).toFixed(1)+','+Y(p.mean-h).toFixed(1);}var rgb=cfg.color==='color'?hexToRgb(col):[80,80,80];s+='<path d="'+up+dn+' Z" fill="rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+',0.16)" stroke="none"/>';}}
     // spaghetti (per replicate index)
-    if(showSpag){for(var r=0;r<nRep;r++){var d='',started=false;ser.pts.forEach(p=>{var k=p.idx.indexOf(r);if(k>=0){d+=(started?' L':'M')+X(p.t).toFixed(1)+','+Y(p.reps[k]).toFixed(1);started=true;}});if(d)s+='<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="'+(LW*0.8).toFixed(2)+'" stroke-opacity="0.32"/>';}}
+    if(showSpag){for(var r=0;r<nRep;r++){var d='',started=false;ser.pts.forEach(p=>{var v=repVal(p,r);if(v!==undefined){d+=(started?' L':'M')+X(p.t).toFixed(1)+','+Y(v).toFixed(1);started=true;}});if(d)s+='<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="'+(LW*0.8).toFixed(2)+'" stroke-opacity="0.32"/>';}}
     // mean line
     var ys=ser.pts.map(p=>p.mean),xs=ser.pts.map(p=>p.t);
     var plotYs=smooth?movingAvg(ys,smW):ys;
+    // band (centred on the plotted, possibly smoothed, line)
+    if(showBand){var hasBand=ser.pts.some(p=>p.n>=2);if(hasBand){var up='',dn='';ser.pts.forEach((p,i)=>{var h=seriesBandHalf(p);up+=(i?' L':'M')+X(p.t).toFixed(1)+','+Y(plotYs[i]+h).toFixed(1);});for(var i=ser.pts.length-1;i>=0;i--){var p=ser.pts[i],h=seriesBandHalf(p);dn+=' L'+X(p.t).toFixed(1)+','+Y(plotYs[i]-h).toFixed(1);}var rgb=cfg.color==='color'?hexToRgb(col):[80,80,80];s+='<path d="'+up+dn+' Z" fill="rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+',0.16)" stroke="none"/>';}}
     var d='';ser.pts.forEach((p,i)=>{d+=(i?' L':'M')+X(p.t).toFixed(1)+','+Y(plotYs[i]).toFixed(1);});
     s+='<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="'+(LW*2).toFixed(2)+'"'+(dash?' stroke-dasharray="'+dash+'"':'')+' stroke-linejoin="round" stroke-linecap="round"/>';
     // trend overlay
@@ -755,7 +753,7 @@ function buildFacetSVG(S){
   var ext=dataExtent(S);
   if(!ext.xs.length)return emptySVG(W,H,40,50,W-80,H-80);
   var xMin=Math.min.apply(null,ext.xs),xMax=Math.max.apply(null,ext.xs),yMin=Math.min.apply(null,ext.ys),yMax=Math.max.apply(null,ext.ys);
-  var xa=axisTicks(xMin,xMax,4),ya=axisTicks(Math.min(0,yMin),yMax,4);
+  var xa=axisTicks(xMin,xMax,4),ya=axisTicks(yZero()?Math.min(0,yMin):yMin,yZero()?Math.max(0,yMax):yMax,4);
   var s=frameStart(W,H);
   var gw=W/cols,gh=H/rows,padL=46*FS,padR=12,padT=26*FS,padB=30*FS;
   S.forEach((ser,si)=>{
@@ -875,7 +873,7 @@ function runAnalysis(S){
   if(type==='trend')return {type:type,rows:S.map(ser=>{var x=[],y=[];ser.pts.forEach(p=>p.reps.forEach(r=>{x.push(p.t);y.push(r);}));return{name:ser.name,lr:linreg(x,y)};})};
   if(type==='auc'){
     var ref=+document.getElementById('aucRefSel').value||0;
-    var aucs=S.map(ser=>{var perRep=[];for(var r=0;r<nRep;r++){var xs=[],ys=[];ser.pts.forEach(p=>{var k=p.idx.indexOf(r);if(k>=0){xs.push(p.t);ys.push(p.reps[k]);}});if(xs.length>=2&&xs.length===ser.pts.length)perRep.push(trapAUC(xs,ys));}var mx=ser.pts.map(p=>p.t),my=ser.pts.map(p=>p.mean);return{name:ser.name,meanAUC:mx.length>=2?trapAUC(mx,my):null,perRep:perRep};});
+    var aucs=S.map(ser=>{var perRep=[];for(var r=0;r<nRep;r++){var xs=[],ys=[];ser.pts.forEach(p=>{var v=repVal(p,r);if(v!==undefined){xs.push(p.t);ys.push(v);}});if(xs.length>=2&&xs.length===ser.pts.length)perRep.push(trapAUC(xs,ys));}var mx=ser.pts.map(p=>p.t),my=ser.pts.map(p=>p.mean);return{name:ser.name,meanAUC:mx.length>=2?trapAUC(mx,my):null,perRep:perRep};});
     var refA=aucs[ref];
     aucs.forEach((a,i)=>{a.cmp=null;if(i!==ref&&refA&&a.perRep.length>=2&&refA.perRep.length>=2)a.cmp=welch(a.perRep,refA.perRep);});
     return{type:type,ref:ref,rows:aucs};
@@ -1256,9 +1254,10 @@ function detectDelim(name,text){if(/\.tsv$/i.test(name))return '\t';if(/\.csv$/i
 function handleFileUpload(e){var f=e.target.files&&e.target.files[0];if(!f)return;var fr=new FileReader();
   fr.onload=function(){try{var text=String(fr.result);var rows=parseDelimited(text,detectDelim(f.name,text));importData(rows,f.name);}catch(err){uploadMsg('Could not parse file: '+err,true);}e.target.value='';};
   fr.onerror=function(){uploadMsg('Could not read file.',true);};fr.readAsText(f);}
+function unEsc(c){c=(c||'').trim();return /^'[=+\-@]/.test(c)?c.slice(1):c;} // undo the formula-injection guard added on export
 function importData(rows,fname){
   if(!rows.length){uploadMsg('No rows found in the file.',true);return;}
-  var header=rows[0].map(c=>(c||'').trim()),norm=header.map(h=>h.toLowerCase());
+  var header=rows[0].map(unEsc),norm=header.map(h=>h.toLowerCase());
   function find(pred){for(var i=0;i<norm.length;i++)if(pred(norm[i]))return i;return -1;}
   var timeCol=find(h=>h==='time'||h==='t'||h==='x'||h==='timepoint'||h.indexOf('time')===0);
   var valCol=find(h=>h==='value'||h==='val'||h==='y'||h==='measurement'||h==='expression'||h==='signal'||h==='reading'||h.indexOf('value')===0);
@@ -1269,7 +1268,7 @@ function importLong(rows,norm,timeCol,valCol,fname){
   var serCol=norm.findIndex(h=>h==='series'||h==='group'||h==='condition'||h==='sample'||h==='treatment'||h==='arm'||h.indexOf('series')>=0||h.indexOf('group')>=0||h.indexOf('condition')>=0);
   var subCol=norm.findIndex(h=>h==='subject'||h==='id'||h==='replicate'||h==='rep'||h==='animal'||h==='patient'||h.indexOf('subject')>=0||h.indexOf('replicate')>=0);
   var body=rows.slice(1);
-  var recs=body.map(r=>({t:(r[timeCol]||'').trim(),s:serCol>=0?((r[serCol]||'').trim()||'Series 1'):'Series 1',v:(r[valCol]||'').trim(),sub:subCol>=0?(r[subCol]||'').trim():''}))
+  var recs=body.map(r=>({t:(r[timeCol]||'').trim(),s:serCol>=0?(unEsc(r[serCol])||'Series 1'):'Series 1',v:(r[valCol]||'').trim(),sub:subCol>=0?unEsc(r[subCol]):''}))
                .filter(x=>x.t!==''&&x.v!==''&&isFinite(Number(x.t))&&isFinite(Number(x.v)));
   if(!recs.length){uploadMsg('No numeric time/value rows found (check the column names).',true);return;}
   var times=[],names=[];recs.forEach(x=>{if(times.indexOf(x.t)<0)times.push(x.t);if(names.indexOf(x.s)<0)names.push(x.s);});
@@ -1356,7 +1355,7 @@ document.getElementById('tpTestSel').addEventListener('change',()=>{updateTpRefV
 ['tpAdjSel','tpRefSel','acfSeriesSel','corrA','corrB','corrMethod','aucRefSel'].forEach(id=>document.getElementById(id).addEventListener('change',update));
 document.getElementById('acfLagIn').addEventListener('input',e=>{document.getElementById('acfLagVal').textContent=e.target.value;update();});
 ['titleIn','xlabIn','ylabIn'].forEach(id=>document.getElementById(id).addEventListener('input',update));
-['dotsChk','spaghettiChk','markersChk','smoothChk','trendChk','legendChk'].forEach(id=>document.getElementById(id).addEventListener('change',update));
+['dotsChk','spaghettiChk','markersChk','smoothChk','trendChk','legendChk','yZeroChk'].forEach(id=>document.getElementById(id).addEventListener('change',update));
 document.getElementById('smWinIn').addEventListener('input',e=>{document.getElementById('smWinVal').textContent=e.target.value;update();});
 document.getElementById('lwIn').addEventListener('input',e=>{cfg.lw=+e.target.value;document.getElementById('lwVal').textContent=cfg.lw.toFixed(1)+'×';update();});
 document.getElementById('fsIn').addEventListener('input',e=>{cfg.fs=+e.target.value;document.getElementById('fsVal').textContent=cfg.fs.toFixed(1)+'×';update();});

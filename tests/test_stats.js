@@ -91,6 +91,23 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
     const tiny = twoWayANOVA(Array.from({ length: 200 }, () => [[1],[2],[3]]), 200, 3); return { tb, tu, hasA: !!A, tiny }; });
   ok(r.tb < 500 && r.tu < 3000 && r.hasA && r.tiny === null, 'two-way ANOVA is fast (balanced 150x3x3, unbalanced 40x3) and rejects no-df designs', r);
 
+  // 7c. follow-up fixes
+  r = await ev(() => { tpoints = ['0','1','1.0','2']; series = ['A']; nRep = 2; document.getElementById('analysisSel').value = 'auc';
+    data = [[['0','0']],[['2','4']],[['4','6']],[['4','4']]]; const S = computeSeries(); const R = runAnalysis(S); return { n: S[0].pts.length, per: R.rows[0].perRep }; });
+  ok(r.n === 3 && r.per.length === 2 && near(r.per[0], 5) && near(r.per[1], 7), 'duplicate times: per-replicate AUC averages duplicates per column', r);
+  r = await ev(() => { const e = csvCell("=cmd"); tpoints = ['0','1']; series = ['=bad','B']; nRep = 1; data = [[['1'],['2']],[['3'],['4']]]; repeated = false;
+    const csv = buildDataCSV(); importData(parseDelimited(csv, ','), 'x.csv'); return { e, series: series.slice() }; });
+  ok(r.series[0] === '=bad', 'CSV export/import round-trips a series name starting with =', r);
+  r = await ev(() => { tpoints = ['0','1','2','3']; series = ['A']; nRep = 3; data = [[['1','1','1']],[['5','7','9']],[['1','1','1']],[['5','7','9']]]; repeated = false;
+    document.getElementById('smoothChk').checked = true; document.getElementById('smWinIn').value = 3; cfg.chart = 'line'; document.getElementById('analysisSel').value = 'trend'; update();
+    const ok1 = document.getElementById('theSVG') !== null; document.getElementById('smoothChk').checked = false;
+    document.getElementById('yZeroChk').checked = false; tpoints = ['0','1']; series = ['A']; nRep = 1; data = [[['1000']],[['1010']]]; update();
+    const txt = Array.from(document.querySelectorAll('#theSVG text')).map(x => x.textContent); document.getElementById('yZeroChk').checked = true; return { ok1, txt }; });
+  ok(r.ok1 && r.txt.indexOf('1006') >= 0 && r.txt.indexOf('1000') >= 0, 'Y axis can exclude zero (narrow range gets readable ticks)', r.txt);
+  const big = await ev(() => { const T = 150, S = 3, c = (n) => Array.from({ length: n }, () => Math.random()); const u = []; for (let t = 0; t < T; t++) { u.push([]); for (let s = 0; s < S; s++) u[t].push(c(2 + ((t + s) % 3))); }
+    const t0 = performance.now(); const a = twoWayANOVA(u, T, S); return { ms: performance.now() - t0, df: a && a.error.df }; });
+  ok(big.ms < 2000 && big.df > 0, 'wide unbalanced design (150x3) is fast', big);
+
   // 8. full UI run on every analysis/chart should not throw (including degenerate data)
   r = await ev(() => { const out = []; ['trend','timepoint','auc','twoway','acf','corr'].forEach(an => ['line','area','heatmap','facet'].forEach(ch => {
     try { loadExample('few'); repeated = false; document.getElementById('analysisSel').value = an; cfg.chart = ch; update(); loadExample('dense'); update(); tpoints = ['5']; series=['A']; nRep=1; data=[[['1']]]; update(); }
