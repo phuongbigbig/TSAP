@@ -81,6 +81,16 @@ const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs
   r = await ev(() => { importData(parseDelimited("time,series,value,subject\n0,A,1,s1\n0,A,2,s2\n1,A,3,s1\n1,A,4,s2\n", ','), 't.csv'); return repeated; });
   ok(r === true, "import: 'subject' column enables RM mode");
 
+  // 7b. scale invariance and performance
+  r = await ev(() => { const k = 1e-13, ys = [1.2,2.9,4.1,5.2,6.8].map(v => v * k), a = linreg([0,1,2,3,4], ys);
+    const an = anova([[1,2,3].map(v => v * k), [2,3,5].map(v => v * k)]), w = welch([1,2,3].map(v => v * k), [2,3,5].map(v => v * k)); return { a, an, w }; });
+  ok(r.a.p > 0 && r.a.p < 0.01 && r.an.p > 0.05 && r.an.p < 1 && r.w.p > 0.05 && r.w.p < 1, 'tiny-scale data is not mistaken for zero variance', r);
+  r = await ev(() => { const T = 150, S = 3, mk = (n) => Array.from({ length: n }, () => Math.random()); const bal = [], unb = [];
+    for (let t = 0; t < T; t++) { bal.push([]); unb.push([]); for (let s = 0; s < S; s++) { bal[t].push(mk(3)); unb[t].push(mk(2 + ((t + s) % 2))); } }
+    let t0 = performance.now(); const A = twoWayANOVA(bal, T, S); const tb = performance.now() - t0; t0 = performance.now(); twoWayANOVA(unb, 40, S); const tu = performance.now() - t0;
+    const tiny = twoWayANOVA(Array.from({ length: 200 }, () => [[1],[2],[3]]), 200, 3); return { tb, tu, hasA: !!A, tiny }; });
+  ok(r.tb < 500 && r.tu < 3000 && r.hasA && r.tiny === null, 'two-way ANOVA is fast (balanced 150x3x3, unbalanced 40x3) and rejects no-df designs', r);
+
   // 8. full UI run on every analysis/chart should not throw (including degenerate data)
   r = await ev(() => { const out = []; ['trend','timepoint','auc','twoway','acf','corr'].forEach(an => ['line','area','heatmap','facet'].forEach(ch => {
     try { loadExample('few'); repeated = false; document.getElementById('analysisSel').value = an; cfg.chart = ch; update(); loadExample('dense'); update(); tpoints = ['5']; series=['A']; nRep=1; data=[[['1']]]; update(); }
