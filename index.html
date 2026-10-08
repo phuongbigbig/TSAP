@@ -366,11 +366,12 @@ function betacf(a,b,x){var MAXIT=200,EPS=3e-12,FPMIN=1e-300,qab=a+b,qap=a+1,qam=
 function betai(a,b,x){if(x<=0)return 0;if(x>=1)return 1;var bt=Math.exp(logGamma(a+b)-logGamma(a)-logGamma(b)+a*Math.log(x)+b*Math.log(1-x));if(x<(a+1)/(a+b+2))return bt*betacf(a,b,x)/a;return 1-bt*betacf(b,a,1-x)/b;}
 function tDistP(t,df){if(!isFinite(t)||df<=0)return 1;return betai(df/2,0.5,df/(df+t*t));}
 function fDistP(F,d1,d2){if(!isFinite(F)||F<=0)return 1;return betai(d2/2,d1/2,d2/(d2+d1*F));}
+function parseNum(x){if(x===null||x===undefined)return NaN;var t=String(x).trim();if(t==='')return NaN;var v=Number(t);return isFinite(v)?v:NaN;}
 function mean(a){return a.reduce((s,v)=>s+v,0)/a.length;}
 function variance(a){if(a.length<2)return 0;var m=mean(a);return a.reduce((s,v)=>s+(v-m)*(v-m),0)/(a.length-1);}
 function sd(a){return Math.sqrt(variance(a));}
-function welch(a,b){var n1=a.length,n2=b.length,m1=mean(a),m2=mean(b),v1=variance(a),v2=variance(b),se=Math.sqrt(v1/n1+v2/n2);if(se===0)return{t:0,df:n1+n2-2,p:1};var t=(m1-m2)/se,df=Math.pow(v1/n1+v2/n2,2)/(Math.pow(v1/n1,2)/(n1-1)+Math.pow(v2/n2,2)/(n2-1));return{t:t,df:df,p:tDistP(t,df)};}
-function anova(groups){var k=groups.length,N=0,all=[];groups.forEach(g=>{N+=g.length;all=all.concat(g);});var grand=mean(all),ssb=0,ssw=0;groups.forEach(g=>{var m=mean(g);ssb+=g.length*(m-grand)*(m-grand);g.forEach(v=>ssw+=(v-m)*(v-m));});var dfb=k-1,dfw=N-k,msb=ssb/dfb,msw=ssw/dfw;return{F:msb/msw,dfb:dfb,dfw:dfw,msw:msw,ssb:ssb,ssw:ssw,p:fDistP(msb/msw,dfb,dfw)};}
+function welch(a,b){var n1=a.length,n2=b.length,m1=mean(a),m2=mean(b),v1=variance(a),v2=variance(b),se=Math.sqrt(v1/n1+v2/n2);if(se===0){var same=Math.abs(m1-m2)<=1e-12*Math.max(1,Math.abs(m1),Math.abs(m2));return{t:same?0:(m1>m2?Infinity:-Infinity),df:n1+n2-2,p:same?1:0};}var t=(m1-m2)/se,df=Math.pow(v1/n1+v2/n2,2)/(Math.pow(v1/n1,2)/(n1-1)+Math.pow(v2/n2,2)/(n2-1));return{t:t,df:df,p:tDistP(t,df)};}
+function anova(groups){var k=groups.length,N=0,all=[];groups.forEach(g=>{N+=g.length;all=all.concat(g);});var grand=mean(all),ssb=0,ssw=0;groups.forEach(g=>{var m=mean(g);ssb+=g.length*(m-grand)*(m-grand);g.forEach(v=>ssw+=(v-m)*(v-m));});var dfb=k-1,dfw=N-k,msb=ssb/dfb,msw=ssw/dfw;if(!(msw>1e-24*Math.max(1,grand*grand))){var sig=ssb>1e-24*Math.max(1,grand*grand);return{F:sig?Infinity:0,dfb:dfb,dfw:dfw,msw:0,ssb:ssb,ssw:ssw,p:sig?0:1};}return{F:msb/msw,dfb:dfb,dfw:dfw,msw:msw,ssb:ssb,ssw:ssw,p:fDistP(msb/msw,dfb,dfw)};}
 function adjustP(ps,method){var m=ps.length;if(method==='bonferroni')return ps.map(p=>Math.min(1,p*m));if(method==='holm'){var idx=ps.map((p,i)=>[p,i]).sort((x,y)=>x[0]-y[0]),out=new Array(m),prev=0;idx.forEach((pair,rank)=>{var adj=Math.min(1,(m-rank)*pair[0]);adj=Math.max(adj,prev);prev=adj;out[pair[1]]=adj;});return out;}return ps.slice();}
 function stars(p){if(!(p<=0.05))return'ns';if(p>0.01)return'*';if(p>0.001)return'**';return'***';}
 function fmtP(p){return p<0.001?'p<0.001':'p='+p.toFixed(3);}
@@ -379,7 +380,7 @@ function invT(alpha,df){if(df<=0)return 1.96;var lo=0,hi=1000;for(var i=0;i<80;i
 
 /* ---- time-series specific stats ---- */
 // linear regression y ~ x; returns slope, intercept, r2, p of slope
-function linreg(xs,ys){var n=xs.length;if(n<2)return null;var mx=mean(xs),my=mean(ys),sxx=0,sxy=0,syy=0;for(var i=0;i<n;i++){sxx+=(xs[i]-mx)*(xs[i]-mx);sxy+=(xs[i]-mx)*(ys[i]-my);syy+=(ys[i]-my)*(ys[i]-my);}if(sxx===0)return null;var slope=sxy/sxx,intercept=my-slope*mx,sse=Math.max(0,syy-slope*sxy),r2=syy>0?1-sse/syy:1;var df=n-2,seSlope=df>0?Math.sqrt((sse/df)/sxx):0,t=seSlope>0?slope/seSlope:0,p=df>0?tDistP(t,df):1;return{slope:slope,intercept:intercept,r2:r2,n:n,df:df,t:t,p:p,seSlope:seSlope};}
+function linreg(xs,ys){var n=xs.length;if(n<2)return null;var mx=mean(xs),my=mean(ys),sxx=0,sxy=0,syy=0;for(var i=0;i<n;i++){sxx+=(xs[i]-mx)*(xs[i]-mx);sxy+=(xs[i]-mx)*(ys[i]-my);syy+=(ys[i]-my)*(ys[i]-my);}if(sxx===0)return null;var slope=sxy/sxx,intercept=my-slope*mx,sse=Math.max(0,syy-slope*sxy),r2=syy>0?1-sse/syy:1;var df=n-2,exact=sse<=1e-20*Math.max(syy,1e-300),seSlope=df>0?Math.sqrt((sse/df)/sxx):0,t,p;if(df<=0){t=0;p=1;}else if(exact||!(seSlope>0)){if(syy===0){t=0;p=1;}else{t=slope>0?Infinity:-Infinity;p=0;}}else{t=slope/seSlope;p=tDistP(t,df);}return{slope:slope,intercept:intercept,r2:r2,n:n,df:df,t:t,p:p,seSlope:seSlope};}
 // trapezoidal AUC over sorted (x,y)
 function trapAUC(xs,ys){var idx=xs.map((x,i)=>i).sort((a,b)=>xs[a]-xs[b]),s=0;for(var k=1;k<idx.length;k++){var a=idx[k-1],b=idx[k];s+=(xs[b]-xs[a])*(ys[a]+ys[b])/2;}return s;}
 // autocorrelation of an evenly-indexed sequence
@@ -387,23 +388,32 @@ function acf(y,maxLag){var n=y.length,m=mean(y),den=0;for(var i=0;i<n;i++)den+=(
 function rank(a){var idx=a.map((v,i)=>[v,i]).sort((x,y)=>x[0]-y[0]),r=new Array(a.length),i=0;while(i<idx.length){var j=i;while(j+1<idx.length&&idx[j+1][0]===idx[i][0])j++;var avg=(i+j)/2+1;for(var k=i;k<=j;k++)r[idx[k][1]]=avg;i=j+1;}return r;}
 function pearson(xs,ys){var n=xs.length;if(n<3)return null;var mx=mean(xs),my=mean(ys),sxy=0,sxx=0,syy=0;for(var i=0;i<n;i++){sxy+=(xs[i]-mx)*(ys[i]-my);sxx+=(xs[i]-mx)*(xs[i]-mx);syy+=(ys[i]-my)*(ys[i]-my);}if(sxx===0||syy===0)return null;var r=sxy/Math.sqrt(sxx*syy),df=n-2,t=r*Math.sqrt(df/Math.max(1e-12,1-r*r)),p=tDistP(t,df);return{r:r,n:n,df:df,t:t,p:p};}
 function spearman(xs,ys){if(xs.length<3)return null;var rx=rank(xs),ry=rank(ys),res=pearson(rx,ry);if(res)res.rho=res.r;return res;}
-// two-way ANOVA with factors Time (T levels) and Series (S levels), replicates per cell
-function twoWayANOVA(cells,T,S){ // cells[ti][si] = replicate numbers; tolerant of unequal n and empty cells
-  var all=[],N=0,nonEmpty=0;for(var ti=0;ti<T;ti++)for(var si=0;si<S;si++){var c=cells[ti][si]||[];if(c.length){nonEmpty++;N+=c.length;all=all.concat(c);}}
-  if(N<3||nonEmpty<2)return null;
-  var grand=mean(all);
-  var rowSum=new Array(T).fill(0),rowN=new Array(T).fill(0),colSum=new Array(S).fill(0),colN=new Array(S).fill(0);
-  var ssCells=0,ssError=0;
-  for(ti=0;ti<T;ti++)for(si=0;si<S;si++){var c=cells[ti][si]||[];if(!c.length)continue;var m=mean(c);ssCells+=c.length*(m-grand)*(m-grand);c.forEach(v=>ssError+=(v-m)*(v-m));rowSum[ti]+=c.reduce((a,b)=>a+b,0);rowN[ti]+=c.length;colSum[si]+=c.reduce((a,b)=>a+b,0);colN[si]+=c.length;}
-  var Tp=rowN.filter(x=>x>0).length,Sp=colN.filter(x=>x>0).length;
-  var ssTime=0;for(ti=0;ti<T;ti++)if(rowN[ti]){var rmn=rowSum[ti]/rowN[ti];ssTime+=rowN[ti]*(rmn-grand)*(rmn-grand);}
-  var ssSeries=0;for(si=0;si<S;si++)if(colN[si]){var cmn=colSum[si]/colN[si];ssSeries+=colN[si]*(cmn-grand)*(cmn-grand);}
-  var ssInter=Math.max(0,ssCells-ssTime-ssSeries);
-  var dfTime=Tp-1,dfSeries=Sp-1,dfError=N-nonEmpty,dfInter=(nonEmpty-1)-dfTime-dfSeries;
-  if(dfError<1||dfTime<1||dfSeries<1)return null;
-  var msErr=ssError/dfError;
-  function row(ss,df){if(df<1||!(msErr>0))return null;var ms=ss/df,F=ms/msErr;return{ss:ss,df:df,ms:ms,F:F,p:fDistP(F,df,dfError)};}
-  return{time:row(ssTime,dfTime),series:row(ssSeries,dfSeries),inter:row(ssInter,dfInter),error:{ss:ssError,df:dfError,ms:msErr},N:N,emptyCells:nonEmpty<Tp*Sp,nonEmpty:nonEmpty,Tp:Tp,Sp:Sp};
+// rank-aware least squares by modified Gram-Schmidt: returns residual SS and rank of the column set
+function lsRSS(cols,y){var n=y.length,Q=[],r=y.slice(),tol=1e-9;
+  cols.forEach(c=>{var v=c.slice(),n0=0;for(var i=0;i<n;i++)n0+=v[i]*v[i];if(n0===0)return;
+    for(var pass=0;pass<2;pass++)Q.forEach(q=>{var d=0;for(var i=0;i<n;i++)d+=q[i]*v[i];for(var i=0;i<n;i++)v[i]-=d*q[i];});
+    var n1=0;for(var i=0;i<n;i++)n1+=v[i]*v[i];if(n1<=tol*tol*n0)return;n1=Math.sqrt(n1);for(var i=0;i<n;i++)v[i]/=n1;Q.push(v);});
+  Q.forEach(q=>{var d=0;for(var i=0;i<n;i++)d+=q[i]*r[i];for(var i=0;i<n;i++)r[i]-=d*q[i];});
+  var rss=0;for(var i=0;i<n;i++)rss+=r[i]*r[i];return{rss:rss,rank:Q.length};}
+// two-way ANOVA with factors Time (T levels) and Series (S levels), replicates per cell.
+// Type III sums of squares (sum-to-zero coding): each term adjusted for all others, so it is valid for unequal n.
+// Equals the classical balanced-design ANOVA when every cell has the same n. Empty cells make Type III only rank-defined.
+function twoWayANOVA(cells,T,S){
+  var y=[],ti_=[],si_=[],N=0,nonEmpty=0,counts=[];
+  for(var ti=0;ti<T;ti++)for(var si=0;si<S;si++){var c=cells[ti][si]||[];if(c.length){nonEmpty++;counts.push(c.length);c.forEach(v=>{y.push(v);ti_.push(ti);si_.push(si);});}}
+  N=y.length;if(N<3||nonEmpty<2)return null;
+  var tLev=[],sLev=[];for(ti=0;ti<T;ti++)if(ti_.indexOf(ti)>=0)tLev.push(ti);for(si=0;si<S;si++)if(si_.indexOf(si)>=0)sLev.push(si);
+  var Tp=tLev.length,Sp=sLev.length;
+  var dfTime=Tp-1,dfSeries=Sp-1;if(dfTime<1||dfSeries<1)return null;
+  function code(levels,arr){var last=levels[levels.length-1];return levels.slice(0,-1).map(l=>arr.map(a=>a===l?1:(a===last?-1:0)));}
+  var tc=code(tLev,ti_),sc=code(sLev,si_),ic=[];
+  tc.forEach(a=>sc.forEach(b=>ic.push(a.map((v,i)=>v*b[i]))));
+  var one=y.map(()=>1),all=[one].concat(tc,sc,ic),full=lsRSS(all,y);
+  var dfError=N-full.rank;if(dfError<1)return null;
+  var msErr=full.rss/dfError,counts_eq=counts.every(x=>x===counts[0])&&nonEmpty===Tp*Sp;
+  function term(cols){var red=lsRSS([one].concat(cols),y),df=full.rank-red.rank,ss=Math.max(0,red.rss-full.rss);
+    if(df<1||!(msErr>1e-300))return null;var ms=ss/df,F=ms/msErr;return{ss:ss,df:df,ms:ms,F:F,p:fDistP(F,df,dfError)};}
+  return{time:term(sc.concat(ic)),series:term(tc.concat(ic)),inter:term(tc.concat(sc)),error:{ss:full.rss,df:dfError,ms:msErr},N:N,emptyCells:nonEmpty<Tp*Sp,unbalanced:!counts_eq,nonEmpty:nonEmpty,Tp:Tp,Sp:Sp};
 }
 
 /* ===================== DATA MODEL ===================== */
@@ -445,33 +455,40 @@ function exampleDense(){
 }
 
 // compute per-series clean structure
+var parseWarn={badTimes:0,badVals:0,dupTimes:0};
 function computeSeries(){
   ensure();
-  var out=[];
+  var out=[],bv=0,dup=0,badT=0;
+  for(var ti=0;ti<tpoints.length;ti++){if(!isFinite(parseNum(tpoints[ti]))&&data[ti]&&data[ti].some(c=>c.some(v=>String(v).trim()!=='')))badT++;}
   for(var si=0;si<series.length;si++){
-    var pts=[];
+    var pts=[],byT={};
     for(var ti=0;ti<tpoints.length;ti++){
-      var t=parseFloat(tpoints[ti]);if(!isFinite(t))continue;
-      var reps=data[ti][si].filter(v=>v!==null&&v!==undefined&&String(v).trim()!==''&&isFinite(Number(v))).map(Number);
-      if(reps.length)pts.push({t:t,reps:reps,mean:mean(reps),n:reps.length});
+      var t=parseNum(tpoints[ti]);if(!isFinite(t))continue;
+      var reps=[],idx=[];
+      data[ti][si].forEach((v,r)=>{if(v===null||v===undefined||String(v).trim()==='')return;var x=parseNum(v);if(isFinite(x)){reps.push(x);idx.push(r);}else bv++;});
+      if(!reps.length)continue;
+      var k=String(t);
+      if(byT[k]){var q=byT[k];q.dupCount=(q.dupCount||1)+1;idx.forEach(r=>q.idx.push(r+nRep*(q.dupCount-1)));q.reps=q.reps.concat(reps);q.n=q.reps.length;q.mean=mean(q.reps);dup++;}
+      else{var pt={t:t,reps:reps,idx:idx,mean:mean(reps),n:reps.length};byT[k]=pt;pts.push(pt);}
     }
     pts.sort((a,b)=>a.t-b.t);
     out.push({name:series[si],pts:pts});
   }
+  parseWarn={badTimes:badT,badVals:bv,dupTimes:dup};
   return out;
 }
 
 /* ---- repeated-measures: replicate column r = one subject tracked across all timepoints ---- */
 function computeRMData(){
   ensure();
-  var ord=tpoints.map((t,i)=>({t:Number(t),i:i})).filter(o=>isFinite(o.t)).sort((a,b)=>a.t-b.t);
+  var ord=tpoints.map((t,i)=>({t:parseNum(t),i:i})).filter(o=>isFinite(o.t)).sort((a,b)=>a.t-b.t);
   var T=ord.length;
   var out=[];
   for(var s=0;s<series.length;s++){
     var subs=[],dropped=0;
     for(var r=0;r<nRep;r++){
       var vals=[],ok=true;
-      for(var k=0;k<T;k++){var raw=data[ord[k].i][s][r];var v=Number(raw);if(raw===''||raw==null||String(raw).trim()===''||!isFinite(v)){ok=false;break;}vals.push(v);}
+      for(var k=0;k<T;k++){var raw=data[ord[k].i][s][r];var v=parseNum(raw);if(!isFinite(v)){ok=false;break;}vals.push(v);}
       if(ok&&T>0)subs.push(vals);else dropped++;
     }
     out.push({name:series[s],subjects:subs,dropped:dropped});
@@ -500,12 +517,25 @@ function rmANOVA(rm){
   var df_series=S-1,df_subj=Ntot-S,df_time=T-1,df_TS=(T-1)*(S-1),df_TSubj=(Ntot-S)*(T-1);
   var MS_subj=df_subj>0?SS_subj/df_subj:NaN,MS_TSubj=df_TSubj>0?SS_TSubj/df_TSubj:NaN;
   function Frow(ss,df,msErr,dfErr){if(df<=0||!(msErr>0)||dfErr<=0)return null;var ms=ss/df,f=ms/msErr;return{ss:ss,df:df,ms:ms,F:f,p:fDistP(f,df,dfErr)};}
+  // Greenhouse-Geisser epsilon from the pooled within-group covariance of the T repeated measures
+  var eps=1;
+  if(T>2&&Ntot-S>0){
+    var Cv=[];for(var i=0;i<T;i++){Cv.push(new Array(T).fill(0));}
+    groups.forEach((g,gi)=>g.subjects.forEach(sb=>{for(var i=0;i<T;i++)for(var j=0;j<T;j++)Cv[i][j]+=(sb[i]-cellMean[gi][i])*(sb[j]-cellMean[gi][j]);}));
+    for(var i=0;i<T;i++)for(var j=0;j<T;j++)Cv[i][j]/=(Ntot-S);
+    var rm_=Cv.map(r=>mean(r)),gm=mean(rm_),Dc=Cv.map((r,i)=>r.map((v,j)=>v-rm_[i]-rm_[j]+gm));
+    var trD=0,trD2=0;for(var i=0;i<T;i++){trD+=Dc[i][i];for(var j=0;j<T;j++)trD2+=Dc[i][j]*Dc[i][j];}
+    eps=trD2>0?Math.min(1,Math.max(1/(T-1),trD*trD/((T-1)*trD2))):1;
+  }
+  function gg(o){if(o&&eps<1){o.pGG=fDistP(o.F,o.df*eps,df_TSubj*eps);}else if(o)o.pGG=o.p;return o;}
+  var balanced=groups.every(g=>g.subjects.length===groups[0].subjects.length);
   return{
+    eps:eps,balanced:balanced,
     S:S,T:T,Ntot:Ntot,
     series:Frow(SS_series,df_series,MS_subj,df_subj),
     subj:{ss:SS_subj,df:df_subj,ms:MS_subj},
-    time:Frow(SS_time,df_time,MS_TSubj,df_TSubj),
-    inter:Frow(SS_TS,df_TS,MS_TSubj,df_TSubj),
+    time:gg(Frow(SS_time,df_time,MS_TSubj,df_TSubj)),
+    inter:gg(Frow(SS_TS,df_TS,MS_TSubj,df_TSubj)),
     tsubj:{ss:SS_TSubj,df:df_TSubj,ms:MS_TSubj},
     used:groups.map(g=>({name:g.name,n:g.subjects.length})),
     dropped:rm.series.map(g=>({name:g.name,d:g.dropped}))
@@ -516,7 +546,7 @@ function rmTrend(rm){
   var rows=rm.series.map(g=>{
     var slopes=g.subjects.map(sb=>{var lr=linreg(rm.times,sb);return lr?lr.slope:null;}).filter(v=>v!=null);
     var o={name:g.name,nSub:slopes.length,slopes:slopes};
-    if(slopes.length>=2){o.meanSlope=mean(slopes);o.sdSlope=sd(slopes);var sem=o.sdSlope/Math.sqrt(slopes.length);o.t=sem>0?o.meanSlope/sem:0;o.df=slopes.length-1;o.p=tDistP(o.t,o.df);}
+    if(slopes.length>=2){o.meanSlope=mean(slopes);o.sdSlope=sd(slopes);var sem=o.sdSlope/Math.sqrt(slopes.length);o.df=slopes.length-1;if(sem>0){o.t=o.meanSlope/sem;o.p=tDistP(o.t,o.df);}else if(Math.abs(o.meanSlope)>1e-12){o.t=o.meanSlope>0?Infinity:-Infinity;o.p=0;}else{o.t=0;o.p=1;}}
     else if(slopes.length===1){o.meanSlope=slopes[0];}
     return o;
   });
@@ -625,7 +655,7 @@ function buildLineSVG(S){
     // band
     if(showBand){var hasBand=ser.pts.some(p=>p.n>=2);if(hasBand){var up='',dn='';ser.pts.forEach((p,i)=>{var h=seriesBandHalf(p);up+=(i?' L':'M')+X(p.t).toFixed(1)+','+Y(p.mean+h).toFixed(1);});for(var i=ser.pts.length-1;i>=0;i--){var p=ser.pts[i],h=seriesBandHalf(p);dn+=' L'+X(p.t).toFixed(1)+','+Y(p.mean-h).toFixed(1);}var rgb=cfg.color==='color'?hexToRgb(col):[80,80,80];s+='<path d="'+up+dn+' Z" fill="rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+',0.16)" stroke="none"/>';}}
     // spaghetti (per replicate index)
-    if(showSpag){for(var r=0;r<nRep;r++){var d='',started=false;ser.pts.forEach(p=>{if(p.reps[r]!==undefined&&isFinite(p.reps[r])){d+=(started?' L':'M')+X(p.t).toFixed(1)+','+Y(p.reps[r]).toFixed(1);started=true;}});if(d)s+='<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="'+(LW*0.8).toFixed(2)+'" stroke-opacity="0.32"/>';}}
+    if(showSpag){for(var r=0;r<nRep;r++){var d='',started=false;ser.pts.forEach(p=>{var k=p.idx.indexOf(r);if(k>=0){d+=(started?' L':'M')+X(p.t).toFixed(1)+','+Y(p.reps[k]).toFixed(1);started=true;}});if(d)s+='<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="'+(LW*0.8).toFixed(2)+'" stroke-opacity="0.32"/>';}}
     // mean line
     var ys=ser.pts.map(p=>p.mean),xs=ser.pts.map(p=>p.t);
     var plotYs=smooth?movingAvg(ys,smW):ys;
@@ -652,7 +682,7 @@ function buildAreaSVG(S){
   // union of timepoints
   var tset={};S.forEach(s=>s.pts.forEach(p=>tset[p.t]=1));var times=Object.keys(tset).map(Number).sort((a,b)=>a-b);
   if(!times.length)return emptySVG(W,H,mT,mL,plotW,plotH);
-  function at(ser,t){var p=ser.pts.find(q=>q.t===t);return p?p.mean:0;}
+  function at(ser,t){var P=ser.pts;if(!P.length||t<P[0].t||t>P[P.length-1].t)return 0;for(var i=0;i<P.length;i++){if(P[i].t===t)return P[i].mean;if(P[i].t>t){var a=P[i-1],b=P[i];return a.mean+(b.mean-a.mean)*(t-a.t)/(b.t-a.t);}}return 0;}
   var stacks=times.map(t=>{var cum=0,arr=[];S.forEach(ser=>{var v=Math.max(0,at(ser,t));cum+=v;arr.push(cum);});return arr;});
   var xMin=times[0],xMax=times[times.length-1],yMax=Math.max.apply(null,stacks.map(a=>a[a.length-1]).concat(0.0001));
   var xa=axisTicks(xMin,xMax,6),ya=axisTicks(0,yMax,6);
@@ -811,8 +841,8 @@ function renderReco(S){
     var pyModel=repeated?'mixed_ri':'anova3', pyName=repeated?'mixed-effects model':'Type III ANOVA';
     var problem=_reco.emptyCell?'has <b>empty series×time cells</b>':'is <b>unbalanced</b> (unequal replicate counts)';
     html+='<div style="margin-top:8px;border-top:1px solid rgba(0,0,0,.12);padding-top:7px">'+
-      '<b>Design note:</b> your design '+problem+'. The built-in '+(repeated?'repeated-measures ANOVA drops incomplete subjects':'two-way ANOVA falls back to sequential (Type I) sums of squares')+
-      ', so results are approximate. For a rigorous, order-independent analysis use the Python '+pyName+
+      '<b>Design note:</b> your design '+problem+'. The built-in '+(repeated?'repeated-measures ANOVA drops incomplete subjects':'two-way ANOVA uses Type III sums of squares (valid for unequal n, but approximate when cells are empty)')+
+      '. For a mixed-model analysis use the Python '+pyName+
       '. <button onclick="useAdvancedModel(\''+pyModel+'\')">'+(pyodide?'Run Python '+pyName:'Load &amp; run Python '+pyName)+'</button></div>';
   }
   box.innerHTML=html;
@@ -836,7 +866,7 @@ function runAnalysis(S){
   if(type==='trend')return {type:type,rows:S.map(ser=>{var x=[],y=[];ser.pts.forEach(p=>p.reps.forEach(r=>{x.push(p.t);y.push(r);}));return{name:ser.name,lr:linreg(x,y)};})};
   if(type==='auc'){
     var ref=+document.getElementById('aucRefSel').value||0;
-    var aucs=S.map(ser=>{var perRep=[];for(var r=0;r<nRep;r++){var xs=[],ys=[];ser.pts.forEach(p=>{if(p.reps[r]!==undefined&&isFinite(p.reps[r])){xs.push(p.t);ys.push(p.reps[r]);}});if(xs.length>=2)perRep.push(trapAUC(xs,ys));}var mx=ser.pts.map(p=>p.t),my=ser.pts.map(p=>p.mean);return{name:ser.name,meanAUC:mx.length>=2?trapAUC(mx,my):null,perRep:perRep};});
+    var aucs=S.map(ser=>{var perRep=[];for(var r=0;r<nRep;r++){var xs=[],ys=[];ser.pts.forEach(p=>{var k=p.idx.indexOf(r);if(k>=0){xs.push(p.t);ys.push(p.reps[k]);}});if(xs.length>=2&&xs.length===ser.pts.length)perRep.push(trapAUC(xs,ys));}var mx=ser.pts.map(p=>p.t),my=ser.pts.map(p=>p.mean);return{name:ser.name,meanAUC:mx.length>=2?trapAUC(mx,my):null,perRep:perRep};});
     var refA=aucs[ref];
     aucs.forEach((a,i)=>{a.cmp=null;if(i!==ref&&refA&&a.perRep.length>=2&&refA.perRep.length>=2)a.cmp=welch(a.perRep,refA.perRep);});
     return{type:type,ref:ref,rows:aucs};
@@ -847,12 +877,12 @@ function runAnalysis(S){
     var raws=[],rows=[];
     times.forEach(t=>{
       var groups=S.map(ser=>{var p=ser.pts.find(q=>q.t===t);return p?p.reps:[];});
-      if(test==='anova'){var valid=groups.filter(g=>g.length>=2);if(valid.length>=2){var a=anova(valid);rows.push({t:t,kind:'anova',F:a.F,dfb:a.dfb,dfw:a.dfw,praw:a.p});raws.push(a.p);}else{rows.push({t:t,kind:'anova',praw:NaN});raws.push(1);}}
+      if(test==='anova'){var valid=groups.filter(g=>g.length>=2);if(valid.length>=2){var a=anova(valid);rows.push({t:t,kind:'anova',F:a.F,dfb:a.dfb,dfw:a.dfw,praw:a.p});raws.push(a.p);}else{rows.push({t:t,kind:'anova',praw:NaN});}}
       else{var a=groups[refS],ok=[];S.forEach((ser,i)=>{if(i===refS)return;var b=groups[i];if(a&&b&&a.length>=2&&b.length>=2){var w=welch(b,a);ok.push({i:i,w:w});}});rows.push({t:t,kind:'tt',pairs:ok});ok.forEach(o=>raws.push(o.w.p));}
     });
     var adjAll=adj==='none'?raws.slice():adjustP(raws,adj);
     // map adjusted back
-    var k=0;rows.forEach(r=>{if(r.kind==='anova'){r.padj=adjAll[k++];}else{r.pairs.forEach(o=>{o.padj=adjAll[k++];});}});
+    var k=0;rows.forEach(r=>{if(r.kind==='anova'){if(!isNaN(r.praw))r.padj=adjAll[k++];}else{r.pairs.forEach(o=>{o.padj=adjAll[k++];});}});
     return{type:type,test:test,adj:adj,refS:refS,rows:rows};
   }
   if(type==='twoway'){
@@ -862,12 +892,13 @@ function runAnalysis(S){
   }
   if(type==='acf'){
     var si=+document.getElementById('acfSeriesSel').value||0,maxLag=+document.getElementById('acfLagIn').value;
-    var ser=S[si];var y=ser.pts.map(p=>p.mean);maxLag=Math.min(maxLag,Math.max(1,y.length-1));
-    return{type:type,name:ser?ser.name:'',acf:y.length>=3?acf(y,maxLag):null,n:y.length};
+    var ser=S[si]||S[0];if(!ser)return{type:type,name:'',acf:null,n:0};var y=ser.pts.map(p=>p.mean);if(!isFinite(maxLag)||maxLag<1)maxLag=10;maxLag=Math.min(maxLag,Math.max(1,y.length-1));
+    var gaps=[];for(var gi=1;gi<ser.pts.length;gi++)gaps.push(ser.pts[gi].t-ser.pts[gi-1].t);var uneven=gaps.length>1&&Math.max.apply(null,gaps)>1.01*Math.min.apply(null,gaps);
+    return{type:type,name:ser.name,acf:y.length>=3?acf(y,maxLag):null,n:y.length,uneven:uneven};
   }
   if(type==='corr'){
     var ai=+document.getElementById('corrA').value||0,bi=+document.getElementById('corrB').value||0,method=document.getElementById('corrMethod').value;
-    var A=S[ai],B=S[bi],xs=[],ys=[];
+    var A=S[ai]||S[0],B=S[bi]||S[0],xs=[],ys=[];
     if(A&&B){var bmap={};B.pts.forEach(p=>bmap[p.t]=p.mean);A.pts.forEach(p=>{if(bmap[p.t]!==undefined){xs.push(p.mean);ys.push(bmap[p.t]);}});}
     var res=method==='spearman'?spearman(xs,ys):pearson(xs,ys);
     return{type:type,method:method,a:A?A.name:'',b:B?B.name:'',n:xs.length,res:res};
@@ -887,7 +918,7 @@ function renderResults(S,R){
     html+='<table><tr><th>Series</th><th>AUC (mean)</th><th>AUC reps (mean±SD)</th><th>vs ref: p</th><th></th></tr>';
     R.rows.forEach((r,i)=>{var repTxt=r.perRep.length?(mean(r.perRep).toPrecision(4)+' ± '+(r.perRep.length>1?sd(r.perRep).toPrecision(2):'—')):'—';var pc=r.cmp?fmtP(r.cmp.p):(i===R.ref?'(ref)':'—');var st=r.cmp?stars(r.cmp.p):'';html+='<tr><td>'+escHtml(r.name)+'</td><td>'+(r.meanAUC!=null?r.meanAUC.toPrecision(4):'—')+'</td><td>'+repTxt+'</td><td>'+pc+'</td><td class="sig">'+st+'</td></tr>';});
     html+='</table>';
-    notes.innerHTML='Area under the curve by the trapezoidal rule over the timepoints. The mean-AUC integrates the mean trajectory; per-replicate AUCs integrate each replicate series separately so they can be compared between series with a Welch t-test (needs ≥2 complete replicate curves per series). AUC summarises total exposure/response over the whole time window in a single number — useful when the shape varies but cumulative effect is the question.';
+    notes.innerHTML='Area under the curve by the trapezoidal rule over the timepoints. The mean-AUC integrates the mean trajectory; per-replicate AUCs integrate each replicate series separately so they can be compared between series with a Welch t-test (needs ≥2 replicate curves per series; a replicate is used only if it has a value at every timepoint of its series, so all curves cover the same interval). AUC summarises total exposure/response over the whole time window in a single number — useful when the shape varies but cumulative effect is the question.';
   } else if(R.type==='timepoint'){
     if(R.test==='anova'){
       html+='<table><tr><th>Time</th><th>F</th><th>df</th><th>p (raw)</th><th>p (adj)</th><th></th></tr>';
@@ -905,7 +936,7 @@ function renderResults(S,R){
       html+='<table><tr><th>Source</th><th>df</th><th>SS</th><th>MS</th><th>F</th><th>p</th><th></th></tr>';
       html+=r3(a.time,'Time')+r3(a.series,'Series')+r3(a.inter,'Time × Series')+'<tr><td>Residual</td><td>'+a.error.df+'</td><td>'+a.error.ss.toPrecision(4)+'</td><td>'+a.error.ms.toPrecision(4)+'</td><td></td><td></td><td></td></tr>';
       html+='</table>';
-      if(a.emptyCells)html+='<div class="hint" style="color:#c05621">⚠ Some series×time cells have no data, so this is an unbalanced design with empty cells: the sums of squares are sequential (Type I) and the interaction df is reduced. Treat these p-values as approximate — for a rigorous unbalanced analysis use the Python <b>Type III ANOVA</b> (card 2b).</div>';
+      if(a.emptyCells)html+='<div class="hint" style="color:#c05621">⚠ Some series×time cells have no data (empty cells): Type III tests are only rank-defined and the interaction df is reduced. Treat these p-values as approximate.</div>';else if(a.unbalanced)html+='<div class="hint">Unequal replicate counts: Type III sums of squares are used (each term adjusted for the others), so the table does not depend on factor order and SS need not add up to the total.</div>';
     }
     notes.innerHTML='Two-way ANOVA partitions variation into a main effect of <b>time</b>, a main effect of <b>series</b>, and their <b>interaction</b>. The interaction is usually the key time-course question: a significant Time × Series term means the series follow <i>different shapes</i> over time (they diverge), not merely sit at different levels. Assumes normal residuals and similar variance across cells; a fixed-effects model is used (timepoints treated as categorical levels).';
   } else if(R.type==='rmanova'){
@@ -922,9 +953,11 @@ function renderResults(S,R){
       html+=rrow(a.inter,'Time × Series');
       html+='<tr><td>Time × Subject</td><td>'+a.tsubj.df+'</td><td>'+a.tsubj.ss.toPrecision(4)+'</td><td>'+(isNaN(a.tsubj.ms)?'—':a.tsubj.ms.toPrecision(4))+'</td><td colspan="3" style="color:var(--muted)">← error for Time terms</td></tr>';
       html+='</table>';
+      if(a.T>2)html+='<div class="hint">Greenhouse–Geisser ε = '+a.eps.toFixed(3)+(a.time?' · Time p(GG) '+fmtP(a.time.pGG):'')+(a.inter?' · Time × Series p(GG) '+fmtP(a.inter.pGG):'')+(a.eps<0.75?' — sphericity looks violated; prefer the GG-corrected p-values.':'.')+'</div>';
+      if(!a.balanced)html+='<div class="hint" style="color:#c05621">⚠ Unequal subject numbers per series: Time and Time × Series sums of squares are approximate; use the Python mixed model for a rigorous analysis.</div>';
       html+='<div class="hint">Subjects used: '+a.used.map(u=>escHtml(u.name)+' n='+u.n).join(', ')+(a.dropped.some(d=>d.d>0)?'. <span style="color:#c05621">Dropped (incomplete): '+a.dropped.filter(d=>d.d>0).map(d=>escHtml(d.name)+' ×'+d.d).join(', ')+'</span>':'')+'</div>';
     }
-    notes.innerHTML='<b>Repeated-measures (mixed) ANOVA — split-plot design.</b> Each subject (a replicate column) is followed across all timepoints, so Time is a <i>within-subject</i> factor and Series is a <i>between-subject</i> factor, with a random intercept per subject. The model uses the correct error terms: the <b>Subject-within-series</b> term tests the Series (group) effect, and the <b>Time × Subject</b> term tests the Time and Time × Series effects — this is what accounts for the correlation between repeated measurements on the same subject. A significant <b>Time × Series</b> means the groups follow different trajectories over time. Requirements: balanced/complete subjects (each used subject has a value at every timepoint; incomplete ones are dropped). Assumes normal residuals and sphericity (equal variance of timepoint differences); with strong sphericity violations a Greenhouse–Geisser correction would be the next refinement.';
+    notes.innerHTML='<b>Repeated-measures (mixed) ANOVA — split-plot design.</b> Each subject (a replicate column) is followed across all timepoints, so Time is a <i>within-subject</i> factor and Series is a <i>between-subject</i> factor, with a random intercept per subject. The model uses the correct error terms: the <b>Subject-within-series</b> term tests the Series (group) effect, and the <b>Time × Subject</b> term tests the Time and Time × Series effects — this is what accounts for the correlation between repeated measurements on the same subject. A significant <b>Time × Series</b> means the groups follow different trajectories over time. Requirements: balanced/complete subjects (each used subject has a value at every timepoint; incomplete ones are dropped). Assumes normal residuals and sphericity (equal variance of timepoint differences); a Greenhouse–Geisser ε and corrected p-values are reported below the table when there are more than 2 timepoints.';
   } else if(R.type==='rmtrend'){
     var rt=R.rt;
     html+='<table><tr><th>Series</th><th>subjects</th><th>mean slope</th><th>SD</th><th>t</th><th>df</th><th>p (slope≠0)</th><th></th></tr>';
@@ -935,6 +968,7 @@ function renderResults(S,R){
   } else if(R.type==='acf'){
     if(!R.acf){html+='<p class="hint">Need ≥3 timepoints.</p>';}
     else{html+='<table><tr><th>Lag</th><th>ACF</th><th>bar</th></tr>';var ci=1.96/Math.sqrt(R.n);R.acf.forEach((v,L)=>{var w=Math.abs(v)*60,sigm=L>0&&Math.abs(v)>ci;html+='<tr><td>'+L+'</td><td>'+v.toFixed(3)+(sigm?' <span class="sig">•</span>':'')+'</td><td><span style="display:inline-block;height:9px;background:'+(v>=0?'#2b6cb0':'#c0392b')+';width:'+w.toFixed(0)+'px"></span></td></tr>';});html+='</table><div class="hint">Dashed 95% band ≈ ±'+ci.toFixed(3)+'; • marks lags outside it.</div>';}
+    if(R.uneven)html+='<div class="hint" style="color:#c05621">⚠ Timepoints are unevenly spaced (or have gaps), but ACF lags count observations, not time units — interpret lags with care or resample to an even grid.</div>';
     notes.innerHTML='Autocorrelation measures how each value of <b>'+escHtml(R.name)+'</b> correlates with itself a given number of timepoints earlier (the lag). Lag 0 is always 1. Bars beyond the ±1.96/√n band suggest real temporal structure (trend or periodicity) rather than noise — e.g. a slowly decaying ACF indicates a trend, an oscillating ACF indicates a cycle. Computed on the mean trajectory; assumes roughly even time spacing.';
   } else if(R.type==='corr'){
     if(!R.res){html+='<p class="hint">Need ≥3 shared timepoints between the two series.</p>';}
@@ -991,8 +1025,9 @@ function update(){
   var S=computeSeries();
   renderReco(S);
   if(S.every(s=>s.pts.length===0))err.textContent='Enter numeric values to plot.';
-  else if(document.getElementById('analysisSel').value!=='trend'&&S.some(s=>s.pts.some(p=>p.n<2))&&cfg.band!=='none'){/* fine, just no band on n=1 */}
-  var R=runAnalysis(S);
+  var w=[];if(parseWarn.badVals)w.push(parseWarn.badVals+' non-numeric value cell(s) ignored (decimal commas are not supported — use ".")');if(parseWarn.badTimes)w.push(parseWarn.badTimes+' row(s) with a non-numeric time ignored');if(parseWarn.dupTimes)w.push('duplicate time values were pooled into one timepoint');
+  if(w.length&&!err.textContent)err.textContent='⚠ '+w.join('; ')+'.';
+    var R=runAnalysis(S);
   lastResult={S:S,R:R};
   var svg;
   if(cfg.chart==='area')svg=buildAreaSVG(S);
@@ -1010,14 +1045,14 @@ function download(blob,name){var url=URL.createObjectURL(blob),a=document.create
 function fileBase(){return (document.getElementById('titleIn').value||'timeseries').replace(/[^\w\-]+/g,'_');}
 function exportSVG(){download(new Blob([currentSVGString()],{type:'image/svg+xml'}),fileBase()+'.svg');}
 function exportPNG(){var svgStr=currentSVGString(),svg=document.getElementById('theSVG'),w=+svg.getAttribute('width'),h=+svg.getAttribute('height'),scale=3,img=new Image(),blob=new Blob([svgStr],{type:'image/svg+xml;charset=utf-8'}),url=URL.createObjectURL(blob);img.onload=function(){var c=document.createElement('canvas');c.width=w*scale;c.height=h*scale;var ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.setTransform(scale,0,0,scale,0,0);ctx.drawImage(img,0,0);URL.revokeObjectURL(url);c.toBlob(b=>download(b,fileBase()+'.png'),'image/png');};img.onerror=function(){alert('PNG export failed; SVG still works.');URL.revokeObjectURL(url);};img.src=url;}
-function csvCell(x){x=String(x);return /[",\n]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x;}
+function csvCell(x){if(typeof x==='string'&&/^[=+\-@\t\r]/.test(x)&&!isFinite(Number(x)))x="'"+x;x=String(x);return /[",\n]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x;}
 function buildStatsMatrix(){
   if(!lastResult||!lastResult.R)return null;var R=lastResult.R,rows=[],rnd=(v,d)=>(v==null||isNaN(v))?'':+(+v).toFixed(d);
   if(R.type==='trend'){rows.push(['Series','slope','intercept','R2','t','df','p','sig']);R.rows.forEach(r=>{if(r.lr)rows.push([r.name,rnd(r.lr.slope,5),rnd(r.lr.intercept,5),rnd(r.lr.r2,4),rnd(r.lr.t,3),r.lr.df,rnd(r.lr.p,5),stars(r.lr.p)]);else rows.push([r.name,'','','','','','','']);});}
   else if(R.type==='auc'){rows.push(['Series','AUC_mean','AUC_reps_mean','AUC_reps_SD','p_vs_ref','sig']);R.rows.forEach(r=>{rows.push([r.name,rnd(r.meanAUC,4),r.perRep.length?rnd(mean(r.perRep),4):'',r.perRep.length>1?rnd(sd(r.perRep),4):'',r.cmp?rnd(r.cmp.p,5):'',r.cmp?stars(r.cmp.p):'']);});}
   else if(R.type==='timepoint'){if(R.test==='anova'){rows.push(['Time','F','df1','df2','p_raw','p_adj','sig']);R.rows.forEach(r=>{rows.push([r.t,rnd(r.F,3),isNaN(r.praw)?'':r.dfb,isNaN(r.praw)?'':r.dfw,rnd(r.praw,5),rnd(r.padj,5),r.padj==null?'':stars(r.padj)]);});}else{rows.push(['Time','Comparison','t','p_raw','p_adj','sig']);R.rows.forEach(r=>{if(!r.pairs.length){rows.push([r.t,'(insufficient)','','','','']);}r.pairs.forEach(o=>rows.push([r.t,series[o.i]+' vs '+series[R.refS],rnd(o.w.t,3),rnd(o.w.p,5),rnd(o.padj,5),o.padj==null?'':stars(o.padj)]));});}}
   else if(R.type==='twoway'){rows.push(['Source','df','SS','MS','F','p','sig']);if(R.aov){var a=R.aov;[['Time',a.time],['Series',a.series],['Time x Series',a.inter]].forEach(x=>{var o=x[1];if(o)rows.push([x[0],o.df,rnd(o.ss,5),rnd(o.ms,5),rnd(o.F,3),rnd(o.p,5),stars(o.p)]);else rows.push([x[0],'not estimable','','','','','']);});rows.push(['Residual',a.error.df,rnd(a.error.ss,5),rnd(a.error.ms,5),'','','']);}}
-  else if(R.type==='rmanova'){rows.push(['Source','df','SS','MS','F','p','sig']);var a=R.rm;if(!a.error){if(a.series)rows.push(['Series',a.series.df,rnd(a.series.ss,5),rnd(a.series.ms,5),rnd(a.series.F,3),rnd(a.series.p,5),stars(a.series.p)]);rows.push(['Subject(within series)',a.subj.df,rnd(a.subj.ss,5),rnd(a.subj.ms,5),'','','']);if(a.time)rows.push(['Time',a.time.df,rnd(a.time.ss,5),rnd(a.time.ms,5),rnd(a.time.F,3),rnd(a.time.p,5),stars(a.time.p)]);if(a.inter)rows.push(['Time x Series',a.inter.df,rnd(a.inter.ss,5),rnd(a.inter.ms,5),rnd(a.inter.F,3),rnd(a.inter.p,5),stars(a.inter.p)]);rows.push(['Time x Subject',a.tsubj.df,rnd(a.tsubj.ss,5),rnd(a.tsubj.ms,5),'','','']);}}
+  else if(R.type==='rmanova'){rows.push(['Source','df','SS','MS','F','p','sig']);var a=R.rm;if(!a.error){if(a.series)rows.push(['Series',a.series.df,rnd(a.series.ss,5),rnd(a.series.ms,5),rnd(a.series.F,3),rnd(a.series.p,5),stars(a.series.p)]);rows.push(['Subject(within series)',a.subj.df,rnd(a.subj.ss,5),rnd(a.subj.ms,5),'','','']);if(a.time)rows.push(['Time',a.time.df,rnd(a.time.ss,5),rnd(a.time.ms,5),rnd(a.time.F,3),rnd(a.time.p,5),stars(a.time.p)]);if(a.inter)rows.push(['Time x Series',a.inter.df,rnd(a.inter.ss,5),rnd(a.inter.ms,5),rnd(a.inter.F,3),rnd(a.inter.p,5),stars(a.inter.p)]);if(a.T>2){rows.push(['Greenhouse-Geisser epsilon','','','','',rnd(a.eps,4),'']);if(a.time)rows.push(['Time p(GG)','','','','',rnd(a.time.pGG,5),stars(a.time.pGG)]);if(a.inter)rows.push(['Time x Series p(GG)','','','','',rnd(a.inter.pGG,5),stars(a.inter.pGG)]);}rows.push(['Time x Subject',a.tsubj.df,rnd(a.tsubj.ss,5),rnd(a.tsubj.ms,5),'','','']);}}
   else if(R.type==='rmtrend'){rows.push(['Series','n_subjects','mean_slope','SD_slope','t','df','p','sig']);R.rt.rows.forEach(r=>{if(r.p!=null)rows.push([r.name,r.nSub,rnd(r.meanSlope,5),rnd(r.sdSlope,5),rnd(r.t,3),r.df,rnd(r.p,5),stars(r.p)]);else rows.push([r.name,r.nSub,'','','','','','']);});if(R.rt.groupCmp)rows.push(['Slopes between series','','','',rnd(R.rt.groupCmp.F,3),R.rt.groupCmp.dfb+';'+R.rt.groupCmp.dfw,rnd(R.rt.groupCmp.p,5),stars(R.rt.groupCmp.p)]);}
   else if(R.type==='acf'){rows.push(['Lag','ACF']);if(R.acf)R.acf.forEach((v,L)=>rows.push([L,rnd(v,5)]));}
   else if(R.type==='corr'){rows.push(['Pair','method','coef','n','p','sig']);if(R.res){var coef=R.method==='spearman'?R.res.rho:R.res.r;rows.push([R.a+' ~ '+R.b,R.method,rnd(coef,4),R.n,rnd(R.res.p,5),stars(R.res.p)]);}}
@@ -1027,7 +1062,7 @@ function exportTable(){var rows=buildStatsMatrix();if(!rows){alert('No results t
 /* ---- minimal XLSX writer (stored ZIP) ---- */
 function crc32(b){var t=crc32.t;if(!t){t=crc32.t=[];for(var n=0;n<256;n++){var c=n;for(var k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}}var crc=0xFFFFFFFF;for(var i=0;i<b.length;i++)crc=(crc>>>8)^t[(crc^b[i])&0xFF];return (crc^0xFFFFFFFF)>>>0;}
 function zipStore(files){var enc=new TextEncoder(),parts=[],central=[],off=0;function u16(n){return [n&255,(n>>8)&255];}function u32(n){return [n&255,(n>>8)&255,(n>>16)&255,(n>>24)&255];}files.forEach(f=>{var data=typeof f.data==='string'?enc.encode(f.data):f.data,nm=enc.encode(f.name),crc=crc32(data);var lh=[].concat([80,75,3,4],u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(data.length),u32(data.length),u16(nm.length),u16(0));parts.push(new Uint8Array(lh),nm,data);central.push({h:[].concat([80,75,1,2],u16(20),u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(data.length),u32(data.length),u16(nm.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(off)),nm:nm});off+=lh.length+nm.length+data.length;});var cdOff=off,cd=[];central.forEach(c=>{cd.push(new Uint8Array(c.h),c.nm);off+=c.h.length+c.nm.length;});var end=new Uint8Array([].concat([80,75,5,6],u16(0),u16(0),u16(files.length),u16(files.length),u32(off-cdOff),u32(cdOff),u16(0)));return new Blob(parts.concat(cd,[end]),{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});}
-function xmlEsc(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+function xmlEsc(s){return String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
 function colL(n){var s='';n++;while(n>0){var m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=(n-m-1)/26;}return s;}
 function exportXLSX(){var rows=buildStatsMatrix();if(!rows){alert('No results to export yet.');return;}var sd2='';rows.forEach((row,ri)=>{var cells='';row.forEach((cell,ci)=>{if(cell===''||cell==null)return;var ref=colL(ci)+(ri+1);if(typeof cell==='number'&&isFinite(cell))cells+='<c r="'+ref+'"><v>'+cell+'</v></c>';else cells+='<c r="'+ref+'" t="inlineStr"><is><t xml:space="preserve">'+xmlEsc(cell)+'</t></is></c>';});sd2+='<row r="'+(ri+1)+'">'+cells+'</row>';});
   var sheet='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'+sd2+'</sheetData></worksheet>';
@@ -1141,7 +1176,7 @@ def run_advanced(data_json, model, repeated):
             rows += '<tr><td>%s</td><td>%.0f</td><td>%.4g</td><td>%s</td><td>%s</td><td class="sig">%s</td></tr>'%(nm,dfn,ss,Fs,ps,sg)
         return ('<p style="margin:0 0 6px"><b>Two-way ANOVA - Type III (sum-to-zero contrasts)</b></p>'
                 '<table><tr><th>Source</th><th>df</th><th>SS</th><th>F</th><th>p</th><th></th></tr>%s</table>'
-                '<div class="hint">Type III SS test each term adjusted for all others - correct for unbalanced data.</div>' % rows)
+                '<div class="hint">Type III SS test each term adjusted for all others - correct for unbalanced data.%s</div>' % (rows, ' <b>Note:</b> repeated-measures mode is on, but this ANOVA ignores subject identity (observations treated as independent); use a mixed model instead.' if repeated else ''))
 
 run_advanced(DATA_JSON, MODEL, REPEATED)
 `;
@@ -1169,8 +1204,8 @@ async function loadPyEngine(){
 }
 function buildLongRows(){
   ensure();var rows=[];
-  for(var ti=0;ti<tpoints.length;ti++){var t=Number(tpoints[ti]);if(!isFinite(t))continue;
-    for(var si=0;si<series.length;si++)for(var r=0;r<nRep;r++){var raw=data[ti][si][r];var v=Number(raw);if(raw===''||raw==null||String(raw).trim()===''||!isFinite(v))continue;
+  for(var ti=0;ti<tpoints.length;ti++){var t=parseNum(tpoints[ti]);if(!isFinite(t))continue;
+    for(var si=0;si<series.length;si++)for(var r=0;r<nRep;r++){var raw=data[ti][si][r];var v=parseNum(raw);if(!isFinite(v))continue;
       rows.push({time:t,series:series[si],subject:repeated?(series[si]+'_S'+(r+1)):(series[si]+'_t'+ti+'_r'+r),value:v});}}
   return rows;
 }
@@ -1229,17 +1264,17 @@ function importLong(rows,norm,timeCol,valCol,fname){
                .filter(x=>x.t!==''&&x.v!==''&&isFinite(Number(x.t))&&isFinite(Number(x.v)));
   if(!recs.length){uploadMsg('No numeric time/value rows found (check the column names).',true);return;}
   var times=[],names=[];recs.forEach(x=>{if(times.indexOf(x.t)<0)times.push(x.t);if(names.indexOf(x.s)<0)names.push(x.s);});
-  times.sort((a,b)=>Number(a)-Number(b));
-  var hasSub=subCol>=0&&recs.some(x=>x.sub!=='');
+  var _seen={};times=times.filter(t=>{var k=String(Number(t));if(_seen[k])return false;_seen[k]=1;return true;});times.sort((a,b)=>Number(a)-Number(b));
+  var hasSub=subCol>=0&&recs.some(x=>x.sub!==''),subRM=hasSub&&/subject|^id$|animal|patient/.test(norm[subCol]);
   var subsBy={};if(hasSub){names.forEach(s=>subsBy[s]=[]);recs.forEach(x=>{if(x.sub!==''&&subsBy[x.s].indexOf(x.sub)<0)subsBy[x.s].push(x.sub);});}
   var nrep;
   if(hasSub)nrep=Math.max(1,...names.map(s=>subsBy[s].length));
-  else{var cnt={};recs.forEach(x=>{var k=x.t+''+x.s;cnt[k]=(cnt[k]||0)+1;});nrep=Math.max.apply(null,[1].concat(Object.keys(cnt).map(k=>cnt[k])));}
-  var tIdx={};times.forEach((t,i)=>tIdx[t]=i);var sIdx={};names.forEach((s,i)=>sIdx[s]=i);
+  else{var cnt={};recs.forEach(x=>{var k=Number(x.t)+''+x.s;cnt[k]=(cnt[k]||0)+1;});nrep=Math.max.apply(null,[1].concat(Object.keys(cnt).map(k=>cnt[k])));}
+  var tIdx={};times.forEach((t,i)=>tIdx[String(Number(t))]=i);var sIdx={};names.forEach((s,i)=>sIdx[s]=i);
   var nd=[];for(var ti=0;ti<times.length;ti++){nd[ti]=[];for(var si=0;si<names.length;si++){nd[ti][si]=[];for(var r=0;r<nrep;r++)nd[ti][si].push('');}}
-  if(hasSub)recs.forEach(x=>{var r=subsBy[x.s].indexOf(x.sub);if(r>=0&&r<nrep)nd[tIdx[x.t]][sIdx[x.s]][r]=x.v;});
-  else{var fi={};recs.forEach(x=>{var k=x.t+''+x.s,r=fi[k]||0;if(r<nrep)nd[tIdx[x.t]][sIdx[x.s]][r]=x.v;fi[k]=r+1;});}
-  applyImported(times,names,nrep,nd,hasSub,fname);
+  if(hasSub)recs.forEach(x=>{var r=subsBy[x.s].indexOf(x.sub);if(r>=0&&r<nrep)nd[tIdx[String(Number(x.t))]][sIdx[x.s]][r]=x.v;});
+  else{var fi={};recs.forEach(x=>{var k=Number(x.t)+''+x.s,r=fi[k]||0;if(r<nrep)nd[tIdx[String(Number(x.t))]][sIdx[x.s]][r]=x.v;fi[k]=r+1;});}
+  applyImported(times,names,nrep,nd,subRM,fname);
 }
 function importWide(rows,header,fname){
   if(rows.length<2){uploadMsg('Need a header row and at least one data row.',true);return;}
